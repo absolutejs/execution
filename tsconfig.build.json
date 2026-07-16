@@ -1,1 +1,6 @@
-{"extends":"./tsconfig.json","compilerOptions":{"emitDeclarationOnly":true,"rootDir":"src"},"include":["src"],"exclude":["tests","dist"]}
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": { "emitDeclarationOnly": true, "rootDir": "src" },
+  "include": ["src"],
+  "exclude": ["tests", "dist"]
+}

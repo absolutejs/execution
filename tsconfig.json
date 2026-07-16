@@ -1,1 +1,15 @@
-{"compilerOptions":{"target":"ESNext","module":"ESNext","moduleResolution":"bundler","strict":true,"noUncheckedIndexedAccess":true,"declaration":true,"outDir":"dist","types":["bun"]},"include":["src","tests"],"exclude":["dist"]}
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "declaration": true,
+    "outDir": "dist",
+    "types": ["bun"]
+  },
+  "include": ["src", "tests"],
+  "exclude": ["dist"]
+}

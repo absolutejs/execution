@@ -41,8 +41,13 @@ export const createEffectWorker = ({
     const controller = new AbortController();
     try {
       const result = await handler.execute(effect.input, {
+        actionId: effect.actionId,
+        effectId: effect.effectId,
         idempotencyKey: effect.idempotencyKey,
+        inputDigest: effect.inputDigest,
+        ...(effect.runId ? { runId: effect.runId } : {}),
         signal: controller.signal,
+        tenantId: effect.tenantId,
       });
       if (!(await store.succeed(effect.effectId, workerId, result, now()))) {
         throw new UnknownEffectOutcomeError(

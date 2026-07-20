@@ -142,12 +142,19 @@ export type EffectStore = {
 export type EffectHandler = {
   compensate?: (
     result: unknown,
-    context: { idempotencyKey: string; signal: AbortSignal },
+    context: EffectHandlerContext,
   ) => Promise<void>;
-  execute: (
-    input: unknown,
-    context: { idempotencyKey: string; signal: AbortSignal },
-  ) => Promise<unknown>;
+  execute: (input: unknown, context: EffectHandlerContext) => Promise<unknown>;
+};
+
+export type EffectHandlerContext = {
+  actionId: string;
+  effectId: string;
+  idempotencyKey: string;
+  inputDigest: string;
+  runId?: string;
+  signal: AbortSignal;
+  tenantId: string;
 };
 
 export type ExecutionJobs = {

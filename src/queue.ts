@@ -99,8 +99,13 @@ export const createExecutionQueueHandler =
     }
     try {
       const result = await handler.execute(effect.input, {
+        actionId: effect.actionId,
+        effectId: effect.effectId,
         idempotencyKey: effect.idempotencyKey,
+        inputDigest: effect.inputDigest,
+        ...(effect.runId ? { runId: effect.runId } : {}),
         signal: context.signal,
+        tenantId: effect.tenantId,
       });
       await store.finishAttempt(attemptId, "succeeded", now());
       if (!(await store.succeed(effectId, workerId, result, now()))) {
@@ -174,8 +179,13 @@ export const compensateEffect = async ({
   });
   try {
     await compensate(effect.result, {
+      actionId: effect.actionId,
+      effectId: effect.effectId,
       idempotencyKey: `${effect.idempotencyKey}:compensate`,
+      inputDigest: effect.inputDigest,
+      ...(effect.runId ? { runId: effect.runId } : {}),
       signal,
+      tenantId: effect.tenantId,
     });
     await store.finishAttempt(attemptId, "succeeded", now());
     return await store.finishCompensation(effectId, workerId, now());

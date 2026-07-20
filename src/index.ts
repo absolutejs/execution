@@ -22,6 +22,7 @@ export type {
   EffectAttemptKind,
   EffectAttemptOutcome,
   EffectHandler,
+  EffectHandlerContext,
   EffectOutboxRecord,
   EffectRecord,
   EffectStatus,

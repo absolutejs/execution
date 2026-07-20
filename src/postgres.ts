@@ -62,6 +62,20 @@ CREATE TABLE IF NOT EXISTS ${ns}.effect_outbox (
 CREATE INDEX IF NOT EXISTS effect_outbox_claim_idx ON ${ns}.effect_outbox (lease_expires_at, created_at);`;
 };
 
+export const executionTenantInventoryPostgresSchemaSql = (
+  namespace = "execution",
+) => {
+  const ns = namespaceOf(namespace);
+  return `ALTER TABLE ${ns}.effects ADD COLUMN IF NOT EXISTS tenant_id text;
+ALTER TABLE ${ns}.effects ADD COLUMN IF NOT EXISTS run_id text;
+UPDATE ${ns}.effects SET tenant_id = COALESCE(data->>'tenantId', 'legacy') WHERE tenant_id IS NULL;
+ALTER TABLE ${ns}.effects ALTER COLUMN tenant_id SET NOT NULL;
+ALTER TABLE ${ns}.effects DROP CONSTRAINT IF EXISTS effects_idempotency_key_key;
+CREATE UNIQUE INDEX IF NOT EXISTS effects_tenant_idempotency_idx ON ${ns}.effects (tenant_id, idempotency_key);
+CREATE INDEX IF NOT EXISTS effects_tenant_inventory_idx ON ${ns}.effects (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS effects_run_inventory_idx ON ${ns}.effects (run_id, created_at DESC);`;
+};
+
 type EffectRow = {
   attempts: number;
   data: EffectRecord | string;
@@ -111,8 +125,8 @@ export const createPostgresEffectStore = ({
     enqueue: async (effect) => {
       const result = await client.query<{ effect_id: string }>(
         `WITH inserted AS (
-          INSERT INTO ${ns}.effects (effect_id, action_id, handler, idempotency_key, status, attempts, available_at, input_digest, data, created_at, updated_at)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
+          INSERT INTO ${ns}.effects (effect_id, action_id, handler, idempotency_key, status, attempts, available_at, input_digest, data, created_at, updated_at, tenant_id, run_id)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)
           ON CONFLICT DO NOTHING RETURNING effect_id, created_at
         ), queued AS (
           INSERT INTO ${ns}.effect_outbox (event_id, effect_id, created_at)
@@ -130,6 +144,8 @@ export const createPostgresEffectStore = ({
           JSON.stringify(effect),
           effect.createdAt,
           effect.updatedAt,
+          effect.tenantId,
+          effect.runId ?? null,
         ],
       );
       return result.rows[0] !== undefined;
@@ -219,6 +235,15 @@ export const createPostgresEffectStore = ({
           )
         ).rows[0],
       ),
+    getByIdempotencyKey: async (tenantId, idempotencyKey) =>
+      parseEffect(
+        (
+          await client.query<EffectRow>(
+            `SELECT data, attempts FROM ${ns}.effects WHERE tenant_id = $1 AND idempotency_key = $2`,
+            [tenantId, idempotencyKey],
+          )
+        ).rows[0],
+      ),
     heartbeat: async (effectId, workerId, leaseMs, now) => {
       const result = await client.query<{ effect_id: string }>(
         `UPDATE ${ns}.effects SET lease_expires_at = $3 + $4, updated_at = $3, data = data || jsonb_build_object('leaseExpiresAt',$3 + $4,'updatedAt',$3) WHERE effect_id = $1 AND lease_owner = $2 AND status = 'leased' RETURNING effect_id`,
@@ -254,6 +279,22 @@ export const createPostgresEffectStore = ({
         startedAt: Number(row.started_at),
         workerId: row.worker_id,
       }));
+    },
+    list: async (input) => {
+      const result = await client.query<EffectRow>(
+        `SELECT data, attempts FROM ${ns}.effects
+         WHERE ($1::text IS NULL OR tenant_id = $1)
+           AND ($2::text IS NULL OR run_id = $2)
+           AND ($3::text IS NULL OR status = $3)
+         ORDER BY created_at DESC LIMIT $4`,
+        [
+          input.tenantId ?? null,
+          input.runId ?? null,
+          input.status ?? null,
+          input.limit,
+        ],
+      );
+      return result.rows.map((row) => parseEffect(row)!);
     },
     publishOutbox: async (eventId, workerId) => {
       const result = await client.query<{ event_id: string }>(

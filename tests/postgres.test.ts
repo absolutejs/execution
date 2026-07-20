@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createPostgresEffectStore,
   executionPostgresSchemaSql,
+  executionTenantInventoryPostgresSchemaSql,
   type EffectRecord,
   type ExecutionSqlClient,
 } from "../src";
@@ -12,6 +13,13 @@ describe("PostgreSQL effect store", () => {
     expect(sql).toContain("effect_attempts");
     expect(sql).toContain("effect_outbox");
     expect(() => executionPostgresSchemaSql("bad-name")).toThrow();
+  });
+
+  test("ships tenant inventory and tenant-scoped idempotency migration", () => {
+    const sql = executionTenantInventoryPostgresSchemaSql();
+    expect(sql).toContain("tenant_id");
+    expect(sql).toContain("effects_tenant_idempotency_idx");
+    expect(sql).toContain("DROP CONSTRAINT IF EXISTS");
   });
 
   test("creates the effect and outbox event in one SQL statement", async () => {
@@ -34,6 +42,7 @@ describe("PostgreSQL effect store", () => {
       input: {},
       inputDigest: "digest",
       status: "pending",
+      tenantId: "tenant-1",
       updatedAt: 0,
     };
     expect(await store.enqueue(effect)).toBe(true);

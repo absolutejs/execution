@@ -2,6 +2,7 @@ export { createMemoryEffectStore } from "./memory";
 export {
   createPostgresEffectStore,
   executionPostgresSchemaSql,
+  executionTenantInventoryPostgresSchemaSql,
   type ExecutionSqlClient,
   type ExecutionSqlResult,
 } from "./postgres";
@@ -12,6 +13,10 @@ export {
   executionJobs,
 } from "./queue";
 export { createEffectWorker, UnknownEffectOutcomeError } from "./worker";
+export {
+  createAgentRuntimeEffectExecutor,
+  TerminalEffectError,
+} from "./runtime";
 export type {
   EffectAttempt,
   EffectAttemptKind,

@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/execution",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Crash-safe external effect execution for AI agents with a transactional outbox, queue integration, reconciliation, and compensation.",
   "type": "module",
   "license": "MIT",
@@ -36,10 +36,11 @@
     "format": "prettier --write \"./**/*.{ts,json,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external @sinclair/typebox && tsc -p tsconfig.build.json && absolute-manifest emit",
+    "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external '@absolutejs/*' --external @sinclair/typebox && tsc -p tsconfig.build.json && absolute-manifest emit",
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
+    "@absolutejs/agent-runtime": "^0.2.0",
     "@absolutejs/manifest": "^0.2.0",
     "@sinclair/typebox": "^0.34.0"
   },

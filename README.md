@@ -23,10 +23,12 @@ import {
   createPostgresEffectStore,
   executionJobs,
   executionPostgresSchemaSql,
+  executionTenantInventoryPostgresSchemaSql,
 } from "@absolutejs/execution";
 import { createJobRegistry, createQueueWorker } from "@absolutejs/queue";
 
 await sql.unsafe(executionPostgresSchemaSql());
+await sql.unsafe(executionTenantInventoryPostgresSchemaSql());
 const effects = createPostgresEffectStore({ client });
 const dispatch = createExecutionOutboxDispatcher({
   store: effects,
@@ -52,3 +54,9 @@ If a provider times out after accepting a request, throw
 the effect as `unknown` until an operator or provider webhook calls
 `store.reconcile(...)`. Successful effects can be reversed explicitly with
 `compensateEffect()` when the handler provides `compensate`.
+
+Agent Runtime hosts should use `createAgentRuntimeEffectExecutor()` rather than
+returning an enqueue result as if it were a completed effect. The bridge stores
+one tenant/run-fenced effect and asks Runtime to wait until the queue handler
+records a terminal result. Its `authorize` callback must return the exact
+Agency action ID and input digest retained for execution-time lease issuance.

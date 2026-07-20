@@ -1,11 +1,16 @@
 import { describe, expect, test } from "bun:test";
 import {
+  createAgentRuntime,
+  createMemoryAgentRuntimeStore,
+} from "@absolutejs/agent-runtime";
+import {
   createInMemoryJobStore,
   createJobRegistry,
   createQueueWorker,
 } from "@absolutejs/queue";
 import {
   compensateEffect,
+  createAgentRuntimeEffectExecutor,
   createEffectWorker,
   createExecutionOutboxDispatcher,
   createExecutionQueueHandler,
@@ -27,6 +32,7 @@ const effect = (id: string): EffectRecord => ({
   input: { message: "hello" },
   inputDigest: "sha256:digest",
   status: "pending",
+  tenantId: "tenant-1",
   updatedAt: 0,
 });
 
@@ -176,4 +182,58 @@ test("compensation is explicit, idempotency-scoped, and recorded", async () => {
   expect(key).toBe("comp-1:compensate");
   expect((await store.get("comp-1"))?.status).toBe("compensated");
   expect((await store.listAttempts("comp-1"))[0]?.kind).toBe("compensate");
+});
+
+test("bridges a runtime wait to one tenant-fenced durable effect", async () => {
+  let clock = 0;
+  const effects = createMemoryEffectStore();
+  const runtime = createAgentRuntime({
+    driver: {
+      next: async ({ steps }) =>
+        steps.some(({ kind }) => kind === "effect.completed")
+          ? { output: { ok: true }, type: "complete" }
+          : {
+              idempotencyKey: "simulate-1",
+              input: { plan: "preview" },
+              name: "simulation.complete",
+              type: "effect",
+            },
+    },
+    effects: createAgentRuntimeEffectExecutor({
+      authorize: async () => ({
+        actionId: "action-simulate-1",
+        inputDigest: "sha256:simulate-1",
+      }),
+      now: () => clock,
+      store: effects,
+    }),
+    now: () => clock,
+    store: createMemoryAgentRuntimeStore(),
+  });
+  const run = await runtime.start({
+    actor: { agentId: "agent-1", tenantId: "tenant-1", userId: "user-1" },
+    agent: {
+      descriptorDigest: "sha256:agent",
+      descriptorId: "https://agent.example/descriptor",
+      descriptorVersion: "1.0.0",
+    },
+    goal: "Preview",
+    input: {},
+  });
+  expect((await runtime.workOne("runtime-1"))?.status).toBe("waiting");
+  expect(await effects.list({ limit: 10, tenantId: "tenant-2" })).toEqual([]);
+  const [pending] = await effects.list({ limit: 10, tenantId: "tenant-1" });
+  expect(pending?.runId).toBe(run.id);
+  await createEffectWorker({
+    handlers: {
+      "simulation.complete": {
+        execute: async () => ({ simulated: true }),
+      },
+    },
+    now: () => clock,
+    store: effects,
+    workerId: "effect-1",
+  }).runOnce();
+  clock = 1_001;
+  expect((await runtime.workOne("runtime-2"))?.status).toBe("completed");
 });

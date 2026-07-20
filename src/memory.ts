@@ -29,7 +29,9 @@ export const createMemoryEffectStore = (): EffectStore => {
       locked(() => {
         if (
           [...rows.values()].some(
-            (row) => row.idempotencyKey === effect.idempotencyKey,
+            (row) =>
+              row.tenantId === effect.tenantId &&
+              row.idempotencyKey === effect.idempotencyKey,
           )
         ) {
           return false;
@@ -155,6 +157,14 @@ export const createMemoryEffectStore = (): EffectStore => {
       const row = rows.get(effectId);
       return row ? structuredClone(row) : undefined;
     },
+    getByIdempotencyKey: async (tenantId, idempotencyKey) => {
+      const row = [...rows.values()].find(
+        (candidate) =>
+          candidate.tenantId === tenantId &&
+          candidate.idempotencyKey === idempotencyKey,
+      );
+      return row ? structuredClone(row) : undefined;
+    },
     heartbeat: (effectId, workerId, leaseMs, now) =>
       locked(() => {
         const row = rows.get(effectId);
@@ -173,6 +183,17 @@ export const createMemoryEffectStore = (): EffectStore => {
         .filter((attempt) => attempt.effectId === effectId)
         .sort((left, right) => left.startedAt - right.startedAt)
         .map((attempt) => structuredClone(attempt)),
+    list: async (input) =>
+      [...rows.values()]
+        .filter(
+          (row) =>
+            (!input.tenantId || row.tenantId === input.tenantId) &&
+            (!input.runId || row.runId === input.runId) &&
+            (!input.status || row.status === input.status),
+        )
+        .sort((left, right) => right.createdAt - left.createdAt)
+        .slice(0, input.limit)
+        .map((row) => structuredClone(row)),
     publishOutbox: (eventId, workerId) =>
       locked(() => {
         const event = outbox.get(eventId);

@@ -24,7 +24,9 @@ export type EffectRecord = {
   leaseOwner?: string;
   result?: unknown;
   status: EffectStatus;
+  tenantId: string;
   updatedAt: number;
+  runId?: string;
 };
 
 export type EffectAttemptKind = "execute" | "compensate";
@@ -90,6 +92,16 @@ export type EffectStore = {
     now: number,
   ) => Promise<boolean>;
   get: (effectId: string) => Promise<EffectRecord | undefined>;
+  getByIdempotencyKey: (
+    tenantId: string,
+    idempotencyKey: string,
+  ) => Promise<EffectRecord | undefined>;
+  list: (input: {
+    limit: number;
+    runId?: string;
+    status?: EffectStatus;
+    tenantId?: string;
+  }) => Promise<EffectRecord[]>;
   listAttempts: (effectId: string) => Promise<EffectAttempt[]>;
   reconcile: (
     effectId: string,

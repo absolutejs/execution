@@ -154,10 +154,10 @@ export const createPostgresEffectStore = ({
       const result = await client.query<EffectRow>(
         `WITH candidate AS (
           SELECT effect_id FROM ${ns}.effects
-          WHERE available_at <= $1 AND (status IN ('pending','failed') OR (status = 'leased' AND lease_expires_at <= $1))
+          WHERE available_at <= $1::bigint AND (status IN ('pending','failed') OR (status = 'leased' AND lease_expires_at <= $1::bigint))
           ORDER BY available_at, created_at FOR UPDATE SKIP LOCKED LIMIT 1
-        ) UPDATE ${ns}.effects e SET status = 'leased', attempts = e.attempts + 1, lease_owner = $2, lease_expires_at = $1 + $3, updated_at = $1,
-          data = e.data || jsonb_build_object('status','leased','attempts',e.attempts + 1,'leaseOwner',$2,'leaseExpiresAt',$1 + $3,'updatedAt',$1)
+        ) UPDATE ${ns}.effects e SET status = 'leased', attempts = e.attempts + 1, lease_owner = $2::text, lease_expires_at = $1::bigint + $3::bigint, updated_at = $1::bigint,
+          data = e.data || jsonb_build_object('status','leased','attempts',e.attempts + 1,'leaseOwner',$2::text,'leaseExpiresAt',$1::bigint + $3::bigint,'updatedAt',$1::bigint)
           FROM candidate WHERE e.effect_id = candidate.effect_id RETURNING e.data, e.attempts`,
         [now, workerId, leaseMs],
       );
@@ -165,9 +165,9 @@ export const createPostgresEffectStore = ({
     },
     claimEffect: async (effectId, workerId, leaseMs, now) => {
       const result = await client.query<EffectRow>(
-        `UPDATE ${ns}.effects SET status = 'leased', attempts = attempts + 1, lease_owner = $2, lease_expires_at = $3 + $4, updated_at = $3,
-          data = data || jsonb_build_object('status','leased','attempts',attempts + 1,'leaseOwner',$2,'leaseExpiresAt',$3 + $4,'updatedAt',$3)
-         WHERE effect_id = $1 AND available_at <= $3 AND (status IN ('pending','failed') OR (status = 'leased' AND lease_expires_at <= $3))
+        `UPDATE ${ns}.effects SET status = 'leased', attempts = attempts + 1, lease_owner = $2::text, lease_expires_at = $3::bigint + $4::bigint, updated_at = $3::bigint,
+          data = data || jsonb_build_object('status','leased','attempts',attempts + 1,'leaseOwner',$2::text,'leaseExpiresAt',$3::bigint + $4::bigint,'updatedAt',$3::bigint)
+         WHERE effect_id = $1::text AND available_at <= $3::bigint AND (status IN ('pending','failed') OR (status = 'leased' AND lease_expires_at <= $3::bigint))
          RETURNING data, attempts`,
         [effectId, workerId, now, leaseMs],
       );
@@ -246,7 +246,7 @@ export const createPostgresEffectStore = ({
       ),
     heartbeat: async (effectId, workerId, leaseMs, now) => {
       const result = await client.query<{ effect_id: string }>(
-        `UPDATE ${ns}.effects SET lease_expires_at = $3 + $4, updated_at = $3, data = data || jsonb_build_object('leaseExpiresAt',$3 + $4,'updatedAt',$3) WHERE effect_id = $1 AND lease_owner = $2 AND status = 'leased' RETURNING effect_id`,
+        `UPDATE ${ns}.effects SET lease_expires_at = $3::bigint + $4::bigint, updated_at = $3::bigint, data = data || jsonb_build_object('leaseExpiresAt',$3::bigint + $4::bigint,'updatedAt',$3::bigint) WHERE effect_id = $1::text AND lease_owner = $2::text AND status = 'leased' RETURNING effect_id`,
         [effectId, workerId, now, leaseMs],
       );
       return result.rows[0] !== undefined;
@@ -340,7 +340,7 @@ export const createPostgresEffectStore = ({
     },
     startCompensation: async (effectId, workerId, now) => {
       const result = await client.query<EffectRow>(
-        `UPDATE ${ns}.effects SET status = 'compensating', lease_owner = $2, updated_at = $3, data = data || jsonb_build_object('status','compensating','leaseOwner',$2,'updatedAt',$3) WHERE effect_id = $1 AND status IN ('succeeded','compensation_failed') RETURNING data, attempts`,
+        `UPDATE ${ns}.effects SET status = 'compensating', lease_owner = $2::text, updated_at = $3::bigint, data = data || jsonb_build_object('status','compensating','leaseOwner',$2::text,'updatedAt',$3::bigint) WHERE effect_id = $1::text AND status IN ('succeeded','compensation_failed') RETURNING data, attempts`,
         [effectId, workerId, now],
       );
       return parseEffect(result.rows[0]);

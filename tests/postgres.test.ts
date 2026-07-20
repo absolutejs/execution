@@ -64,4 +64,23 @@ describe("PostgreSQL effect store", () => {
     await store.claimOutbox("worker", 30_000, 1);
     expect(calls.every((sql) => sql.includes("SKIP LOCKED"))).toBe(true);
   });
+
+  test("casts lease parameters for Bun's native PostgreSQL client", async () => {
+    const queries: string[] = [];
+    const store = createPostgresEffectStore({
+      client: {
+        query: async <Row>(text: string) => {
+          queries.push(text);
+          return { rows: [] as Row[] };
+        },
+      },
+    });
+
+    await store.claim("worker", 30_000, 1);
+    await store.claimEffect("effect", "worker", 30_000, 1);
+    await store.heartbeat("effect", "worker", 30_000, 1);
+
+    expect(queries.join("\n")).toContain("$2::text");
+    expect(queries.join("\n")).toContain("$3::bigint");
+  });
 });

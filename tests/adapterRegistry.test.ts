@@ -36,6 +36,14 @@ const certificate = async (
         results: [{ name: "execution-boundary/replay", passed: true }],
         suite: "agent-durable-execution-boundary",
       },
+      {
+        failed: 0,
+        passed: 1,
+        results: [
+          { name: "adapter-registry/uncertified-activation", passed: true },
+        ],
+        suite: "agent-effect-adapter-registry",
+      },
     ],
     subject: { name: value.adapterId, version: value.version },
   }),

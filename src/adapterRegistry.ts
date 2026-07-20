@@ -78,7 +78,10 @@ export class EffectAdapterActivationError extends Error {}
 
 const DEFAULT_CERTIFICATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const REQUIRED_PROFILE = "absolutejs-agent-first-1";
-const REQUIRED_SUITE = "agent-durable-execution-boundary";
+const REQUIRED_SUITES = [
+  "agent-durable-execution-boundary",
+  "agent-effect-adapter-registry",
+] as const;
 
 const stable = (value: unknown): string =>
   JSON.stringify(value, (_key, item) =>
@@ -303,15 +306,17 @@ export const createEffectAdapterRegistry = (options: {
         now() - issuedAt > maximumAge
       )
         reasons.push("certification_stale");
-      const suite = certification.certificate.reports.find(
-        ({ suite }) => suite === REQUIRED_SUITE,
-      );
-      if (
-        !suite ||
-        suite.failed !== 0 ||
-        suite.results.some(({ passed }) => !passed)
-      )
-        reasons.push("required_suite_missing_or_failed");
+      const suitesPass = REQUIRED_SUITES.every((requiredSuite) => {
+        const suite = certification.certificate.reports.find(
+          ({ suite }) => suite === requiredSuite,
+        );
+        return (
+          suite !== undefined &&
+          suite.failed === 0 &&
+          !suite.results.some(({ passed }) => !passed)
+        );
+      });
+      if (!suitesPass) reasons.push("required_suite_missing_or_failed");
       if (!(await options.verifyEvidence(certification)))
         reasons.push("evidence_unverified");
       if (!certification.evidenceReference.trim())

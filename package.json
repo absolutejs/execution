@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/execution",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Crash-safe external effect execution for AI agents with a transactional outbox, queue integration, reconciliation, and compensation.",
   "type": "module",
   "license": "MIT",
@@ -40,14 +40,17 @@
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
-    "@absolutejs/agent-runtime": "^0.2.0",
     "@absolutejs/manifest": "^0.2.0",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
+    "@absolutejs/agent-runtime": "^0.2.1",
     "@absolutejs/queue": "^0.4.1",
     "@types/bun": "^1.3.14",
     "prettier": "3.5.3",
     "typescript": "5.8.3"
+  },
+  "peerDependencies": {
+    "@absolutejs/agent-runtime": ">=0.2.1 <0.3.0"
   }
 }

@@ -1,5 +1,15 @@
 export { createMemoryEffectStore } from "./memory";
 export {
+  createEffectAdapterExecutionHandler,
+  EffectAdapterExecutionError,
+  type EffectAdapterDriver,
+  type EffectAdapterDriverCapabilities,
+  type EffectAdapterDriverContext,
+  type EffectAdapterExecutionEnvelope,
+  type EffectAdapterExecutionResult,
+  type ResolvedEffectAdapterCredential,
+} from "./adapterExecution";
+export {
   createEffectAdapterInstallationRegistry,
   createMemoryEffectAdapterInstallationStore,
   createPostgresEffectAdapterInstallationStore,

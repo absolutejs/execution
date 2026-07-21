@@ -44,6 +44,23 @@ const certificate = async (
         ],
         suite: "agent-effect-adapter-registry",
       },
+      {
+        failed: 0,
+        passed: 1,
+        results: [{ name: "adapter-installations/default-off", passed: true }],
+        suite: "agent-effect-adapter-installations",
+      },
+      {
+        failed: 0,
+        passed: 1,
+        results: [
+          {
+            name: "adapter-execution/authorization-before-credentials",
+            passed: true,
+          },
+        ],
+        suite: "agent-effect-adapter-execution",
+      },
     ],
     subject: { name: value.adapterId, version: value.version },
   }),
@@ -121,5 +138,12 @@ describe("effect adapter certification registry", () => {
         },
       }),
     ).rejects.toThrow("require a mandate");
+    await expect(
+      registry.register({
+        ...descriptor(),
+        idempotency: { scope: "tenant-effect", supported: false },
+        reconciliation: { mode: "unsupported" },
+      }),
+    ).rejects.toThrow("idempotency or reconciliation");
   });
 });

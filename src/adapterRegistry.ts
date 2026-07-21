@@ -81,6 +81,8 @@ const REQUIRED_PROFILE = "absolutejs-agent-first-1";
 const REQUIRED_SUITES = [
   "agent-durable-execution-boundary",
   "agent-effect-adapter-registry",
+  "agent-effect-adapter-installations",
+  "agent-effect-adapter-execution",
 ] as const;
 
 const stable = (value: unknown): string =>
@@ -145,6 +147,13 @@ const validateDescriptor = (descriptor: EffectAdapterDescriptor) => {
     descriptor.spendAuthority.currencies.length > 0
   )
     throw new Error("Non-spending adapters cannot declare currencies");
+  if (
+    !descriptor.idempotency.supported &&
+    descriptor.reconciliation.mode === "unsupported"
+  )
+    throw new Error(
+      "Effect adapters require idempotency or reconciliation support",
+    );
 };
 
 export const createMemoryEffectAdapterRegistryStore =

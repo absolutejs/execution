@@ -68,6 +68,23 @@ const certification = async (descriptor: EffectAdapterDescriptor) => ({
         ],
         suite: "agent-effect-adapter-registry",
       },
+      {
+        failed: 0,
+        passed: 1,
+        results: [{ name: "adapter-installations/default-off", passed: true }],
+        suite: "agent-effect-adapter-installations",
+      },
+      {
+        failed: 0,
+        passed: 1,
+        results: [
+          {
+            name: "adapter-execution/authorization-before-credentials",
+            passed: true,
+          },
+        ],
+        suite: "agent-effect-adapter-execution",
+      },
     ],
     subject: { name: descriptor.adapterId, version: descriptor.version },
   }),

@@ -82,3 +82,13 @@ Production hosts should apply
 `effectAdapterInstallationsPostgresSchemaSql()`, then use the corresponding
 PostgreSQL stores. The host callbacks remain responsible for resolving secret
 aliases and validating mandates; raw credentials never enter either registry.
+
+`createEffectAdapterExecutionHandler()` is the final provider boundary. It
+accepts an installation envelope, reauthorizes the exact tenant, effect,
+destination, and spend, verifies that the runtime driver's identity, version,
+idempotency, reconciliation, and compensation capabilities match the certified
+descriptor, and only then resolves the authorized secret aliases. Credential
+values exist only in the driver context and are never placed in the durable
+installation record or bridge result. Unknown provider outcomes should be
+raised as `UnknownEffectOutcomeError` so the queue quarantines them for
+reconciliation instead of retrying an ambiguous side effect.

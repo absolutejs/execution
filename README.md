@@ -55,7 +55,9 @@ the effect as `unknown` until an authorized operator, provider query, or
 provider webhook resolves it through `createEffectRecoveryOperations()`.
 Recovery verifies evidence before one atomic status transition, retains an
 append-only actor/source/evidence record, tenant-fences every case, and permits
-retry only when evidence confirms the provider did not apply the effect. Apply
+retry only when evidence confirms the provider did not apply the effect. That
+transition atomically creates a reconciliation-scoped outbox event so Queue can
+actually schedule the safe retry after the original event was consumed. Apply
 `effectRecoveryPostgresSchemaSql()` before using the PostgreSQL recovery API.
 Successful effects can be reversed explicitly with
 `compensateEffect()` when the handler provides `compensate`.

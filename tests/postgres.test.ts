@@ -63,6 +63,7 @@ describe("PostgreSQL effect store", () => {
     expect(calls).toHaveLength(1);
     expect(calls[0]?.text).toContain("WITH updated AS");
     expect(calls[0]?.text).toContain("effect_reconciliations");
+    expect(calls[0]?.text).toContain("effect_outbox");
     expect(calls[0]?.text).toContain("tenant_id = $5");
   });
 

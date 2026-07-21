@@ -375,11 +375,15 @@ export const createPostgresEffectStore = ({
               updated_at = $4
           WHERE effect_id = $1 AND tenant_id = $5 AND status = 'unknown'
           RETURNING effect_id
-        )
-        INSERT INTO ${ns}.effect_reconciliations
-          (reconciliation_id, effect_id, tenant_id, actor_id, source, resolution, evidence_reference, note, created_at)
-        SELECT $6, effect_id, $5, $7, $8, $9, $10, $11, $4 FROM updated
-        RETURNING effect_id`,
+        ), reconciled AS (
+          INSERT INTO ${ns}.effect_reconciliations
+            (reconciliation_id, effect_id, tenant_id, actor_id, source, resolution, evidence_reference, note, created_at)
+          SELECT $6, effect_id, $5, $7, $8, $9, $10, $11, $4 FROM updated
+          RETURNING effect_id
+        ), queued AS (
+          INSERT INTO ${ns}.effect_outbox (event_id, effect_id, created_at)
+          SELECT $12, effect_id, $4 FROM reconciled WHERE $2 = 'pending'
+        ) SELECT effect_id FROM reconciled`,
         [
           effectId,
           status,
@@ -392,6 +396,7 @@ export const createPostgresEffectStore = ({
           reconciliation.resolution,
           reconciliation.evidenceReference,
           reconciliation.note,
+          `effect:${effectId}:recovery:${reconciliation.reconciliationId}`,
         ],
       );
       return result.rows[0] !== undefined;

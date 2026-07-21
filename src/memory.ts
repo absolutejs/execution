@@ -237,6 +237,14 @@ export const createMemoryEffectStore = (): EffectStore &
           reconciliation.reconciliationId,
           structuredClone(reconciliation),
         );
+        if (status === "pending") {
+          const eventId = `effect:${effectId}:recovery:${reconciliation.reconciliationId}`;
+          outbox.set(eventId, {
+            attempts: 0,
+            effectId,
+            eventId,
+          });
+        }
         return true;
       }),
     recordAttempt: (attempt) =>

@@ -127,6 +127,9 @@ describe("effect recovery operations", () => {
   test("retries only through an explicit confirmed-not-applied resolution", async () => {
     const store = createMemoryEffectStore();
     await store.enqueue(unknownEffect("effect-5"));
+    const original = await store.claimOutbox("dispatcher", 30_000, 1);
+    if (!original) throw new Error("Initial effect outbox event was not found");
+    await store.publishOutbox(original.eventId, "dispatcher");
     const resolved = await operations(store).resolve({
       ...request("effect-5"),
       resolution: "confirmed_not_applied",
@@ -135,5 +138,8 @@ describe("effect recovery operations", () => {
     expect(resolved.reconciliationHistory[0]?.resolution).toBe(
       "confirmed_not_applied",
     );
+    const retry = await store.claimOutbox("dispatcher", 30_000, 3);
+    expect(retry?.effectId).toBe("effect-5");
+    expect(retry?.eventId).toContain(":recovery:");
   });
 });

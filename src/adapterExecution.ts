@@ -204,6 +204,13 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
       tenantId: context.tenantId,
     });
     assertDriverMatchesDescriptor(options.driver, authorization.adapter);
+    if (
+      authorization.adapter.idempotency.supported &&
+      !context.idempotencyKey.trim()
+    )
+      throw new EffectAdapterExecutionError(
+        "Idempotent adapters require a stable effect idempotency key",
+      );
     const credentials = await resolveCredentials({
       credentials: authorization.credentials,
       descriptor: authorization.adapter,

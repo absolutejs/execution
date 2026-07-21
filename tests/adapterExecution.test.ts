@@ -182,6 +182,23 @@ describe("installed effect adapter execution bridge", () => {
     expect(resolutions).toBe(0);
   });
 
+  test("rejects an empty idempotency key before credential resolution", async () => {
+    let resolutions = 0;
+    const handler = createEffectAdapterExecutionHandler({
+      driver: driver(),
+      installations: installationRegistry(async () => authorization),
+      resolveCredential: async () => {
+        resolutions += 1;
+        return "credential-value";
+      },
+    });
+
+    await expect(
+      handler.execute(input, { ...context(), idempotencyKey: "" }),
+    ).rejects.toThrow("stable effect idempotency key");
+    expect(resolutions).toBe(0);
+  });
+
   test("preserves unknown outcomes for queue quarantine", async () => {
     const handler = createEffectAdapterExecutionHandler({
       driver: driver(async () => {

@@ -22,7 +22,8 @@ export type EffectAdapterSecretRotation =
     };
 
 export type EffectAdapterReconciliation =
-  | { mode: "manual" | "unsupported" }
+  | { mode: "manual" }
+  | { mode: "unsupported" }
   | {
       mode: "query";
       query: {

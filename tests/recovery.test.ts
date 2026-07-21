@@ -51,6 +51,22 @@ const request = (effectId: string) => ({
 });
 
 describe("effect recovery operations", () => {
+  test("creates a default reconciliation id under Bun", async () => {
+    const store = createMemoryEffectStore();
+    await store.enqueue(unknownEffect("effect-default-id"));
+    const recovery = createEffectRecoveryOperations({
+      authorize: async () => true,
+      now: () => 2,
+      store,
+      verifyEvidence: async () => true,
+    });
+
+    const resolved = await recovery.resolve(request("effect-default-id"));
+    expect(resolved.reconciliationHistory[0]?.reconciliationId).toMatch(
+      /^[a-f0-9-]{36}$/,
+    );
+  });
+
   test("redacts payloads and retains append-only evidence", async () => {
     const store = createMemoryEffectStore();
     await store.enqueue(unknownEffect("effect-1"));

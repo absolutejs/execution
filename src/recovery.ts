@@ -95,7 +95,7 @@ export const createEffectRecoveryOperations = (options: {
   }) => Promise<boolean>;
 }) => {
   const now = options.now ?? Date.now;
-  const id = options.id ?? crypto.randomUUID;
+  const id = options.id ?? (() => crypto.randomUUID());
 
   const getUnknown = async (effectId: string, tenantId: string) => {
     const effect = await options.store.get(required(effectId, "effectId"));

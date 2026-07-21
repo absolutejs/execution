@@ -1,5 +1,15 @@
 export { createMemoryEffectStore } from "./memory";
 export {
+  createEffectEvidenceIngestion,
+  createMemoryEffectEvidenceStore,
+  createPostgresEffectEvidenceStore,
+  effectEvidencePostgresSchemaSql,
+  EffectEvidenceError,
+  type EffectEvidenceOutcome,
+  type EffectEvidenceRecord,
+  type EffectEvidenceStore,
+} from "./evidence";
+export {
   createEffectAdapterExecutionHandler,
   effectAdapterExecutionInputDigest,
   EffectAdapterExecutionError,

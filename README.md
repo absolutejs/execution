@@ -62,6 +62,15 @@ actually schedule the safe retry after the original event was consumed. Apply
 Successful effects can be reversed explicitly with
 `compensateEffect()` when the handler provides `compensate`.
 
+Verified provider webhooks and query results can enter recovery through
+`createEffectEvidenceIngestion()`. The ingestion boundary retains only
+normalized, tenant-bound evidence, deduplicates provider delivery IDs, rejects
+attempts to rebind an existing delivery to another effect, and resumes
+reconciliation when a provider retries after a host crash. Production hosts
+should apply `effectEvidencePostgresSchemaSql()` and use
+`createPostgresEffectEvidenceStore()`. Raw webhook payloads and provider
+credentials do not belong in the evidence store.
+
 Agent Runtime hosts should use `createAgentRuntimeEffectExecutor()` rather than
 returning an enqueue result as if it were a completed effect. The bridge stores
 one tenant/run-fenced effect and asks Runtime to wait until the queue handler

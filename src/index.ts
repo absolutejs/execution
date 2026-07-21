@@ -1,5 +1,20 @@
 export { createMemoryEffectStore } from "./memory";
 export {
+  createEffectAdapterInstallationRegistry,
+  createMemoryEffectAdapterInstallationStore,
+  createPostgresEffectAdapterInstallationStore,
+  effectAdapterInstallationsPostgresSchemaSql,
+  EffectAdapterInstallationError,
+  type EffectAdapterCredentialInstallation,
+  type EffectAdapterInstallationAuthorization,
+  type EffectAdapterInstallationInput,
+  type EffectAdapterInstallationPolicy,
+  type EffectAdapterInstallationPosture,
+  type EffectAdapterInstallationRecord,
+  type EffectAdapterInstallationRegistry,
+  type EffectAdapterInstallationStore,
+} from "./adapterInstallations";
+export {
   createEffectAdapterRegistry,
   createMemoryEffectAdapterRegistryStore,
   createPostgresEffectAdapterRegistryStore,

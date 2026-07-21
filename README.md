@@ -60,3 +60,25 @@ returning an enqueue result as if it were a completed effect. The bridge stores
 one tenant/run-fenced effect and asks Runtime to wait until the queue handler
 records a terminal result. Its `authorize` callback must return the exact
 Agency action ID and input digest retained for execution-time lease issuance.
+
+## Certified adapters and tenant installations
+
+`createEffectAdapterRegistry()` is the global fail-closed boundary. Adapter
+descriptors declare effects, destinations, credential slots, idempotency,
+reconciliation, compensation, and spend authority. Activation requires a fresh
+certificate for the exact descriptor digest and host-verified evidence.
+
+`createEffectAdapterInstallationRegistry()` narrows that certified authority for
+one tenant. Every installation pins the adapter version and digest, starts
+disabled, selects an effect and destination subset, maps required adapter
+credential slots to host-owned secret aliases without storing values, and can
+bind a per-effect spend ceiling to a mandate. Enabling and every authorization
+recheck the global adapter, descriptor pin, credential aliases, mandate,
+destination, effect, tenant, and spend ceiling. Descriptor drift or revoked
+evidence therefore stops every dependent installation without a rollout.
+
+Production hosts should apply
+`effectAdapterRegistryPostgresSchemaSql()` and
+`effectAdapterInstallationsPostgresSchemaSql()`, then use the corresponding
+PostgreSQL stores. The host callbacks remain responsible for resolving secret
+aliases and validating mandates; raw credentials never enter either registry.

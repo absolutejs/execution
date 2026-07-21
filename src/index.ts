@@ -75,6 +75,17 @@ export {
   type EffectReconciliationLeaseStore,
 } from "./reconciliation";
 export {
+  createManagedEffectReconciliationScheduler,
+  createMemoryEffectReconciliationSchedulerStore,
+  createPostgresEffectReconciliationSchedulerStore,
+  effectReconciliationSchedulerPostgresSchemaSql,
+  EffectReconciliationSchedulerError,
+  type EffectReconciliationSchedulerPolicy,
+  type EffectReconciliationSchedulerRecord,
+  type EffectReconciliationSchedulerResult,
+  type EffectReconciliationSchedulerStore,
+} from "./scheduler";
+export {
   createPostgresEffectStore,
   effectRecoveryPostgresSchemaSql,
   executionPostgresSchemaSql,

@@ -107,6 +107,15 @@ Operator-triggered owner flows must call `runOnce({ tenantId })`; the tenant
 filter is passed into the durable effect inventory before any lease,
 installation authorization, credential resolution, or provider query occurs.
 
+`createManagedEffectReconciliationScheduler()` adds a durable, explicitly
+default-off control-plane schedule around that runtime. Its store retains the
+interval, next run, replica lease, bounded counters, and a safe error code. A
+policy survives restarts, and `initialize()` never overwrites an operator's
+existing choice. Use `createPostgresEffectReconciliationSchedulerStore()`
+after applying `effectReconciliationSchedulerPostgresSchemaSql()`. The local
+polling loop may run on every replica because only the durable due claim can
+start a reconciliation pass.
+
 `createEffectAdapterInstallationRegistry()` narrows that certified authority for
 one tenant. Every installation pins the adapter version and digest, starts
 disabled, selects an effect and destination subset, maps required adapter

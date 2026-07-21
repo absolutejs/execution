@@ -38,7 +38,19 @@ const providerDescriptor = (): EffectAdapterDescriptor => ({
   destinations: [{ kind: "https-origin", value: "https://api.example.test" }],
   effects: ["message.send"],
   idempotency: { scope: "tenant-effect", supported: true },
-  reconciliation: { mode: "query" },
+  reconciliation: {
+    mode: "query",
+    query: {
+      credentialAlias: "API_TOKEN",
+      health: {
+        staleAfterMs: 15 * 60 * 1_000,
+        strategy: "last-successful-query",
+      },
+      provider: "provider",
+      rotation: { mode: "replace", verification: "successful-query" },
+      supportedOutcomes: ["delivered", "failed"],
+    },
+  },
   spendAuthority: {
     canSpend: true,
     currencies: ["USD"],

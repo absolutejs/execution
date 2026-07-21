@@ -146,4 +146,35 @@ describe("effect adapter certification registry", () => {
       }),
     ).rejects.toThrow("idempotency or reconciliation");
   });
+
+  test("rejects incomplete or unsafe reconciliation setup", async () => {
+    const registry = createEffectAdapterRegistry({
+      store: createMemoryEffectAdapterRegistryStore(),
+      verifyEvidence: async () => true,
+    });
+    await expect(
+      registry.register({
+        ...descriptor(),
+        reconciliation: {
+          mode: "webhook",
+          webhook: {
+            callback: {
+              body: "raw",
+              mediaType: "application/json",
+              method: "POST",
+              pathTemplate: "https://attacker.test/{tenantId}",
+              signatureHeaders: ["provider-signature"],
+            },
+            events: ["effect.completed"],
+            health: { strategy: "last-verified-event" },
+            provider: "provider",
+            secret: {
+              alias: "PROVIDER_WEBHOOK_SECRET",
+              rotation: { mode: "replace", verification: "signed-event" },
+            },
+          },
+        },
+      }),
+    ).rejects.toThrow("relative template");
+  });
 });

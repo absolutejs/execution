@@ -40,15 +40,18 @@ export {
   createMemoryEffectAdapterRegistryStore,
   createPostgresEffectAdapterRegistryStore,
   effectAdapterDescriptorDigest,
+  effectAdapterWebhookCallbackPath,
   effectAdapterRegistryPostgresSchemaSql,
   EffectAdapterActivationError,
   type EffectAdapterCertification,
   type EffectAdapterConformanceCertificate,
   type EffectAdapterDescriptor,
   type EffectAdapterDestination,
+  type EffectAdapterReconciliation,
   type EffectAdapterRegistryPosture,
   type EffectAdapterRegistryRecord,
   type EffectAdapterRegistryStore,
+  type EffectAdapterSecretRotation,
 } from "./adapterRegistry";
 export {
   createPostgresEffectStore,

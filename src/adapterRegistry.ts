@@ -10,6 +10,55 @@ export type EffectAdapterDestination = {
   value: string;
 };
 
+export type EffectAdapterSecretRotation =
+  | {
+      mode: "overlap";
+      overlapMs: number;
+      verification: "signed-event" | "successful-query";
+    }
+  | {
+      mode: "replace";
+      verification: "signed-event" | "successful-query";
+    };
+
+export type EffectAdapterReconciliation =
+  | { mode: "manual" | "unsupported" }
+  | {
+      mode: "query";
+      query: {
+        credentialAlias: string;
+        health: {
+          staleAfterMs: number;
+          strategy: "last-successful-query";
+        };
+        provider: string;
+        rotation: EffectAdapterSecretRotation;
+        supportedOutcomes: ReadonlyArray<string>;
+      };
+    }
+  | {
+      mode: "webhook";
+      webhook: {
+        callback: {
+          body: "raw";
+          mediaType: "application/json";
+          method: "POST";
+          pathTemplate: string;
+          signatureHeaders: ReadonlyArray<string>;
+        };
+        events: ReadonlyArray<string>;
+        health: {
+          staleAfterMs?: number;
+          strategy: "last-verified-event";
+        };
+        provider: string;
+        secret: {
+          alias: string;
+          rotation: EffectAdapterSecretRotation;
+        };
+      };
+    };
+
 export type EffectAdapterDescriptor = {
   adapterId: string;
   compensation: { supported: boolean };
@@ -21,7 +70,7 @@ export type EffectAdapterDescriptor = {
   destinations: ReadonlyArray<EffectAdapterDestination>;
   effects: ReadonlyArray<string>;
   idempotency: { scope: "effect" | "tenant-effect"; supported: boolean };
-  reconciliation: { mode: "manual" | "query" | "webhook" | "unsupported" };
+  reconciliation: EffectAdapterReconciliation;
   spendAuthority: {
     canSpend: boolean;
     currencies: ReadonlyArray<string>;
@@ -120,6 +169,92 @@ const conformanceCertificateDigest = async (
 const duplicates = (values: ReadonlyArray<string>) =>
   new Set(values).size !== values.length;
 
+const validStrings = (values: ReadonlyArray<string>) =>
+  values.length > 0 &&
+  !duplicates(values) &&
+  values.every((value) => value.trim() === value && value.length > 0);
+
+const validDuration = (value: number) =>
+  Number.isSafeInteger(value) && value > 0;
+
+const validateRotation = (rotation: EffectAdapterSecretRotation) => {
+  if (rotation.mode === "overlap" && !validDuration(rotation.overlapMs))
+    throw new Error("Effect adapter rotation overlap must be positive");
+};
+
+const validateReconciliation = (descriptor: EffectAdapterDescriptor) => {
+  const { reconciliation } = descriptor;
+  if (reconciliation.mode === "webhook") {
+    const { webhook } = reconciliation;
+    const { pathTemplate, signatureHeaders } = webhook.callback;
+    if (
+      !pathTemplate.startsWith("/") ||
+      pathTemplate.includes("://") ||
+      pathTemplate.includes("..") ||
+      pathTemplate.includes("?") ||
+      pathTemplate.includes("#") ||
+      pathTemplate.split("{tenantId}").length !== 2
+    )
+      throw new Error(
+        "Effect adapter webhook path must be a relative template with one {tenantId}",
+      );
+    if (
+      !validStrings(signatureHeaders) ||
+      signatureHeaders.some((header) => header !== header.toLowerCase())
+    )
+      throw new Error(
+        "Effect adapter webhook signature headers must be unique lowercase names",
+      );
+    if (!validStrings(webhook.events))
+      throw new Error(
+        "Effect adapter webhook events must be non-empty and unique",
+      );
+    if (!webhook.provider.trim() || !webhook.secret.alias.trim())
+      throw new Error(
+        "Effect adapter webhook provider and secret alias are required",
+      );
+    if (
+      webhook.health.staleAfterMs !== undefined &&
+      !validDuration(webhook.health.staleAfterMs)
+    )
+      throw new Error(
+        "Effect adapter webhook health duration must be positive",
+      );
+    validateRotation(webhook.secret.rotation);
+  }
+  if (reconciliation.mode === "query") {
+    const { query } = reconciliation;
+    if (!query.provider.trim() || !query.credentialAlias.trim())
+      throw new Error(
+        "Effect adapter query provider and credential alias are required",
+      );
+    if (
+      !descriptor.credentialBindings.some(
+        ({ alias }) => alias === query.credentialAlias,
+      )
+    )
+      throw new Error(
+        "Effect adapter query credential targets an undeclared binding",
+      );
+    if (!validStrings(query.supportedOutcomes))
+      throw new Error(
+        "Effect adapter query outcomes must be non-empty and unique",
+      );
+    if (!validDuration(query.health.staleAfterMs))
+      throw new Error("Effect adapter query health duration must be positive");
+    validateRotation(query.rotation);
+  }
+};
+
+export const effectAdapterWebhookCallbackPath = (
+  reconciliation: Extract<EffectAdapterReconciliation, { mode: "webhook" }>,
+  tenantId: string,
+) =>
+  reconciliation.webhook.callback.pathTemplate.replace(
+    "{tenantId}",
+    encodeURIComponent(tenantId),
+  );
+
 const validateDescriptor = (descriptor: EffectAdapterDescriptor) => {
   if (!descriptor.adapterId.trim() || !descriptor.version.trim())
     throw new Error("Effect adapter identity and version are required");
@@ -154,6 +289,7 @@ const validateDescriptor = (descriptor: EffectAdapterDescriptor) => {
     throw new Error(
       "Effect adapters require idempotency or reconciliation support",
     );
+  validateReconciliation(descriptor);
 };
 
 export const createMemoryEffectAdapterRegistryStore =

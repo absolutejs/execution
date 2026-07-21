@@ -84,6 +84,14 @@ Agency action ID and input digest retained for execution-time lease issuance.
 descriptors declare effects, destinations, credential slots, idempotency,
 reconciliation, compensation, and spend authority. Activation requires a fresh
 certificate for the exact descriptor digest and host-verified evidence.
+Webhook reconciliation descriptors must also declare their relative
+`{tenantId}` callback template, raw-body signature headers, project secret
+alias, provider event set, health signal, and replacement or overlap rotation
+behavior. Query reconciliation descriptors bind their provider query to a
+declared credential slot and declare outcomes, health freshness, and rotation
+verification. Registration rejects incomplete or unsafe setup, and
+`effectAdapterWebhookCallbackPath()` renders a tenant-safe callback without
+provider-specific host branching.
 
 `createEffectAdapterInstallationRegistry()` narrows that certified authority for
 one tenant. Every installation pins the adapter version and digest, starts

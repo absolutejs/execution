@@ -210,6 +210,21 @@ export const createMemoryEffectStore = (): EffectStore &
         outbox.delete(eventId);
         return true;
       }),
+    quarantineUnknown: (effectId, attempt, update, now) =>
+      locked(() => {
+        const row = rows.get(effectId);
+        if (!row || row.status !== "leased" || row.attempts !== attempt)
+          return false;
+        rows.set(effectId, {
+          ...row,
+          ...update,
+          leaseExpiresAt: undefined,
+          leaseOwner: undefined,
+          status: "unknown",
+          updatedAt: now,
+        });
+        return true;
+      }),
     reconcile: (effectId, update, now) =>
       locked(() => {
         const row = rows.get(effectId);

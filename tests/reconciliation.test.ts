@@ -33,6 +33,7 @@ const descriptor: EffectAdapterDescriptor = {
       },
       pollingIntervalMs: 60_000,
       provider: "provider",
+      requiresReference: false,
       rotation: { mode: "replace", verification: "successful-query" },
       supportedOutcomes: ["confirmed_succeeded", "confirmed_not_applied"],
     },
@@ -60,8 +61,43 @@ const effect: EffectRecord = {
   tenantId: "tenant-1",
   updatedAt: NOW,
 };
+if (descriptor.reconciliation.mode !== "query")
+  throw new Error("Expected query descriptor");
+const hybridDescriptor: EffectAdapterDescriptor = {
+  ...descriptor,
+  reconciliation: {
+    mode: "webhook-query",
+    query: {
+      ...descriptor.reconciliation.query,
+      requiresReference: true,
+    },
+    webhook: {
+      callback: {
+        body: "raw",
+        mediaType: "application/json",
+        method: "POST",
+        pathTemplate: "/webhooks/{tenantId}/provider",
+        signatureHeaders: ["provider-signature"],
+      },
+      events: ["delivery.confirmed"],
+      health: { strategy: "last-verified-event" },
+      provider: "provider",
+      secret: {
+        alias: "PROVIDER_WEBHOOK_SECRET",
+        rotation: { mode: "replace", verification: "signed-event" },
+      },
+    },
+  },
+  version: "1.1.0",
+};
 
-const setup = (options?: { fail?: boolean }) => {
+const setup = (options?: {
+  descriptor?: EffectAdapterDescriptor;
+  effect?: EffectRecord;
+  fail?: boolean;
+}) => {
+  const configuredDescriptor = options?.descriptor ?? descriptor;
+  const configuredEffect = options?.effect ?? effect;
   const events: string[] = [];
   const healthStore = createMemoryEffectAdapterHealthStore();
   const evidence: unknown[] = [];
@@ -70,7 +106,7 @@ const setup = (options?: { fail?: boolean }) => {
   const runtime = createEffectAdapterReconciliationRuntime({
     drivers: [
       {
-        adapterId: descriptor.adapterId,
+        adapterId: configuredDescriptor.adapterId,
         provider: "provider",
         query: async (queryEffect) => {
           queries += 1;
@@ -87,13 +123,13 @@ const setup = (options?: { fail?: boolean }) => {
             verifier: "provider-query-v1",
           };
         },
-        version: descriptor.version,
+        version: configuredDescriptor.version,
       },
     ],
     effects: {
       list: async (input) => {
         listInputs.push(input);
-        return [effect];
+        return [configuredEffect];
       },
     },
     health: createEffectAdapterHealthOperations({
@@ -107,7 +143,7 @@ const setup = (options?: { fail?: boolean }) => {
       authorize: async () => {
         events.push("authorize");
         return {
-          adapter: descriptor,
+          adapter: configuredDescriptor,
           credentials: [
             {
               adapterAlias: "API_TOKEN",
@@ -116,8 +152,8 @@ const setup = (options?: { fail?: boolean }) => {
             },
           ],
           installation: {
-            adapterId: descriptor.adapterId,
-            adapterVersion: descriptor.version,
+            adapterId: configuredDescriptor.adapterId,
+            adapterVersion: configuredDescriptor.version,
             descriptorDigest: "sha256:descriptor",
             enabled: true,
             installationId: "installation-1",
@@ -195,6 +231,53 @@ describe("effect adapter reconciliation runtime", () => {
       "tenantId is required",
     );
     expect(harness.queries()).toBe(1);
+  });
+
+  test("queries a webhook fallback only when its exact provider reference exists", async () => {
+    const withoutReference = setup({ descriptor: hybridDescriptor });
+    expect(await withoutReference.runtime.runOnce()).toEqual({
+      failed: 0,
+      pending: 0,
+      resolved: 0,
+      scanned: 1,
+      skipped: 1,
+    });
+    expect(withoutReference.events).toEqual(["authorize"]);
+    expect(withoutReference.queries()).toBe(0);
+
+    const withReference = setup({
+      descriptor: hybridDescriptor,
+      effect: {
+        ...effect,
+        reconciliationReference: {
+          adapterId: hybridDescriptor.adapterId,
+          provider: "provider",
+          resourceId: "provider-resource-1",
+        },
+      },
+    });
+    expect((await withReference.runtime.runOnce()).resolved).toBe(1);
+    expect(withReference.events).toContain(
+      "query:effectId,idempotencyKey,inputDigest,reconciliationReference",
+    );
+    expect(withReference.queries()).toBe(1);
+  });
+
+  test("rejects a reconciliation reference rebound to another adapter", async () => {
+    const harness = setup({
+      descriptor: hybridDescriptor,
+      effect: {
+        ...effect,
+        reconciliationReference: {
+          adapterId: "other.adapter",
+          provider: "provider",
+          resourceId: "provider-resource-1",
+        },
+      },
+    });
+    expect((await harness.runtime.runOnce()).failed).toBe(1);
+    expect(harness.events).toEqual(["authorize"]);
+    expect(harness.queries()).toBe(0);
   });
 
   test("provider failures retain a bounded safe code, never raw errors", async () => {

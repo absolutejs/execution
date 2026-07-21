@@ -2,7 +2,11 @@ import type {
   EffectAdapterInstallationRegistry,
   EffectAdapterInstallationAuthorization,
 } from "./adapterInstallations";
-import type { EffectAdapterDescriptor } from "./adapterRegistry";
+import {
+  effectAdapterQueryReconciliation,
+  type EffectAdapterDescriptor,
+  type EffectAdapterQueryReconciliation,
+} from "./adapterRegistry";
 import {
   parseEffectAdapterExecutionEnvelope,
   type EffectAdapterExecutionEnvelope,
@@ -85,6 +89,7 @@ export type EffectAdapterQueryDriver = {
       effectId: string;
       idempotencyKey: string;
       inputDigest: string;
+      reconciliationReference?: EffectRecord["reconciliationReference"];
     },
     context: {
       credential: ResolvedEffectAdapterCredential;
@@ -387,13 +392,8 @@ export const createPostgresEffectReconciliationLeaseStore = (options: {
   };
 };
 
-type QueryDescriptor = Extract<
-  EffectAdapterDescriptor["reconciliation"],
-  { mode: "query" }
->;
-
 const queryCredential = (
-  descriptor: QueryDescriptor,
+  query: EffectAdapterQueryReconciliation,
   credentials: ReadonlyArray<{
     adapterAlias: string;
     destination: string;
@@ -401,7 +401,7 @@ const queryCredential = (
   }>,
 ) => {
   const matches = credentials.filter(
-    ({ adapterAlias }) => adapterAlias === descriptor.query.credentialAlias,
+    ({ adapterAlias }) => adapterAlias === query.credentialAlias,
   );
   if (matches.length !== 1)
     throw new EffectAdapterReconciliationError(
@@ -414,15 +414,15 @@ const queryDriver = (
   drivers: ReadonlyArray<EffectAdapterQueryDriver>,
   descriptor: EffectAdapterDescriptor,
 ) => {
-  if (descriptor.reconciliation.mode !== "query")
+  const query = effectAdapterQueryReconciliation(descriptor.reconciliation);
+  if (!query)
     throw new EffectAdapterReconciliationError(
       "Effect adapter does not support provider-query reconciliation",
     );
-  const reconciliation = descriptor.reconciliation;
   const matches = drivers.filter(
     (driver) =>
       driver.adapterId === descriptor.adapterId &&
-      driver.provider === reconciliation.query.provider &&
+      driver.provider === query.provider &&
       driver.version === descriptor.version,
   );
   if (matches.length !== 1)
@@ -482,13 +482,15 @@ export const createEffectAdapterReconciliationRuntime = (options: {
 
     let adapter: EffectAdapterDescriptor | undefined;
     let envelope: EffectAdapterExecutionEnvelope | undefined;
+    let query: EffectAdapterQueryReconciliation | undefined;
     try {
       envelope = parseEffectAdapterExecutionEnvelope(effect.input);
       const authorization = await options.installations.authorize(
         authorizationInput(effect, envelope),
       );
       adapter = authorization.adapter;
-      if (adapter.reconciliation.mode !== "query") {
+      query = effectAdapterQueryReconciliation(adapter.reconciliation);
+      if (!query) {
         const completedAt = now();
         await options.leases.complete({
           effectId: effect.effectId,
@@ -498,11 +500,27 @@ export const createEffectAdapterReconciliationRuntime = (options: {
         });
         return "skipped" as const;
       }
+      const reference = effect.reconciliationReference;
+      if (query.requiresReference && reference === undefined) {
+        const completedAt = now();
+        await options.leases.complete({
+          effectId: effect.effectId,
+          nextCheckAt: completedAt + query.pollingIntervalMs,
+          now: completedAt,
+          owner: options.workerId,
+        });
+        return "skipped" as const;
+      }
+      if (
+        reference !== undefined &&
+        (reference.adapterId !== adapter.adapterId ||
+          reference.provider !== query.provider)
+      )
+        throw new EffectAdapterReconciliationError(
+          "Reconciliation reference differs from the authorized adapter",
+        );
       const driver = queryDriver(options.drivers, adapter);
-      const installed = queryCredential(
-        adapter.reconciliation,
-        authorization.credentials,
-      );
+      const installed = queryCredential(query, authorization.credentials);
       const value = await options.resolveCredential({
         ...installed,
         tenantId: effect.tenantId,
@@ -525,6 +543,7 @@ export const createEffectAdapterReconciliationRuntime = (options: {
           effectId: effect.effectId,
           idempotencyKey: effect.idempotencyKey,
           inputDigest: effect.inputDigest,
+          ...(reference ? { reconciliationReference: reference } : {}),
         },
         {
           credential: { ...installed, mode: declared.mode, value },
@@ -536,7 +555,7 @@ export const createEffectAdapterReconciliationRuntime = (options: {
       await options.health.observe({
         adapterId: adapter.adapterId,
         code: "query_succeeded",
-        provider: adapter.reconciliation.query.provider,
+        provider: query.provider,
         scopeId: envelope.installationId,
         signal: "provider-query",
         status: "healthy",
@@ -554,7 +573,7 @@ export const createEffectAdapterReconciliationRuntime = (options: {
             ),
             occurredAt: result.occurredAt,
             outcome: result.outcome,
-            provider: adapter.reconciliation.query.provider,
+            provider: query.provider,
             ...(result.providerResourceId
               ? { providerResourceId: result.providerResourceId }
               : {}),
@@ -568,18 +587,17 @@ export const createEffectAdapterReconciliationRuntime = (options: {
       const completedAt = now();
       await options.leases.complete({
         effectId: effect.effectId,
-        nextCheckAt:
-          completedAt + adapter.reconciliation.query.pollingIntervalMs,
+        nextCheckAt: completedAt + query.pollingIntervalMs,
         now: completedAt,
         owner: options.workerId,
       });
       return result.status;
     } catch {
-      if (adapter?.reconciliation.mode === "query" && envelope !== undefined)
+      if (adapter && query && envelope !== undefined)
         await options.health.observe({
           adapterId: adapter.adapterId,
           code: "query_failed",
-          provider: adapter.reconciliation.query.provider,
+          provider: query.provider,
           scopeId: envelope.installationId,
           signal: "provider-query",
           status: "failed",
@@ -590,10 +608,7 @@ export const createEffectAdapterReconciliationRuntime = (options: {
         effectId: effect.effectId,
         errorCode: "query_failed",
         nextCheckAt:
-          completedAt +
-          (adapter?.reconciliation.mode === "query"
-            ? adapter.reconciliation.query.pollingIntervalMs
-            : options.leaseMs),
+          completedAt + (query ? query.pollingIntervalMs : options.leaseMs),
         now: completedAt,
         owner: options.workerId,
       });

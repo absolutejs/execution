@@ -132,6 +132,68 @@ describe("installed effect adapter execution bridge", () => {
     expect(JSON.stringify(result)).not.toContain("credential-value");
   });
 
+  test("extracts only a descriptor-bound provider reconciliation reference", async () => {
+    const queryDescriptor: EffectAdapterDescriptor = {
+      ...descriptor,
+      reconciliation: {
+        mode: "query",
+        query: {
+          credentialAlias: "API_TOKEN",
+          health: {
+            staleAfterMs: 60_000,
+            strategy: "last-successful-query",
+          },
+          pollingIntervalMs: 10_000,
+          provider: "provider",
+          requiresReference: true,
+          rotation: { mode: "replace", verification: "successful-query" },
+          supportedOutcomes: ["confirmed_succeeded"],
+        },
+      },
+    };
+    const queryAuthorization = { ...authorization, adapter: queryDescriptor };
+    const queryDriver: EffectAdapterDriver<
+      { subject: string },
+      { id: string; privateResponse: string }
+    > = {
+      adapterId: queryDescriptor.adapterId,
+      capabilities: {
+        compensation: false,
+        idempotency: true,
+        reconciliation: "query",
+      },
+      execute: async () => ({
+        id: "provider-resource-1",
+        privateResponse: "never-retain-this",
+      }),
+      reconciliationReference: (output) => ({
+        provider: "provider",
+        resourceId: output.id,
+      }),
+      version: queryDescriptor.version,
+    };
+    const handler = createEffectAdapterExecutionHandler({
+      driver: queryDriver,
+      installations: installationRegistry(async () => queryAuthorization),
+      resolveCredential: async () => "credential-value",
+    });
+
+    const result = await handler.execute(input, context(INPUT_DIGEST));
+    expect(result).toMatchObject({
+      reconciliationReference: {
+        adapterId: "provider",
+        provider: "provider",
+        resourceId: "provider-resource-1",
+      },
+    });
+    expect(
+      JSON.stringify(
+        (result as { reconciliationReference: unknown })
+          .reconciliationReference,
+      ),
+    ).not.toContain("never-retain-this");
+  });
+
   test("binds exact tenant, effect, destination, and idempotency context", async () => {
     let authorized: unknown;
     let received: unknown;

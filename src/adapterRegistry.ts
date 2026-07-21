@@ -21,44 +21,54 @@ export type EffectAdapterSecretRotation =
       verification: "signed-event" | "successful-query";
     };
 
+export type EffectAdapterQueryReconciliation = {
+  credentialAlias: string;
+  health: {
+    staleAfterMs: number;
+    strategy: "last-successful-query";
+  };
+  pollingIntervalMs: number;
+  provider: string;
+  requiresReference: boolean;
+  rotation: EffectAdapterSecretRotation;
+  supportedOutcomes: ReadonlyArray<string>;
+};
+
+export type EffectAdapterWebhookReconciliation = {
+  callback: {
+    body: "raw";
+    mediaType: "application/json";
+    method: "POST";
+    pathTemplate: string;
+    signatureHeaders: ReadonlyArray<string>;
+  };
+  events: ReadonlyArray<string>;
+  health: {
+    staleAfterMs?: number;
+    strategy: "last-verified-event";
+  };
+  provider: string;
+  secret: {
+    alias: string;
+    rotation: EffectAdapterSecretRotation;
+  };
+};
+
 export type EffectAdapterReconciliation =
   | { mode: "manual" }
   | { mode: "unsupported" }
   | {
       mode: "query";
-      query: {
-        credentialAlias: string;
-        health: {
-          staleAfterMs: number;
-          strategy: "last-successful-query";
-        };
-        pollingIntervalMs: number;
-        provider: string;
-        rotation: EffectAdapterSecretRotation;
-        supportedOutcomes: ReadonlyArray<string>;
-      };
+      query: EffectAdapterQueryReconciliation;
     }
   | {
       mode: "webhook";
-      webhook: {
-        callback: {
-          body: "raw";
-          mediaType: "application/json";
-          method: "POST";
-          pathTemplate: string;
-          signatureHeaders: ReadonlyArray<string>;
-        };
-        events: ReadonlyArray<string>;
-        health: {
-          staleAfterMs?: number;
-          strategy: "last-verified-event";
-        };
-        provider: string;
-        secret: {
-          alias: string;
-          rotation: EffectAdapterSecretRotation;
-        };
-      };
+      webhook: EffectAdapterWebhookReconciliation;
+    }
+  | {
+      mode: "webhook-query";
+      query: EffectAdapterQueryReconciliation;
+      webhook: EffectAdapterWebhookReconciliation;
     };
 
 export type EffectAdapterDescriptor = {
@@ -188,7 +198,10 @@ const validateRotation = (rotation: EffectAdapterSecretRotation) => {
 
 const validateReconciliation = (descriptor: EffectAdapterDescriptor) => {
   const { reconciliation } = descriptor;
-  if (reconciliation.mode === "webhook") {
+  if (
+    reconciliation.mode === "webhook" ||
+    reconciliation.mode === "webhook-query"
+  ) {
     const { webhook } = reconciliation;
     const { pathTemplate, signatureHeaders } = webhook.callback;
     if (
@@ -226,7 +239,10 @@ const validateReconciliation = (descriptor: EffectAdapterDescriptor) => {
       );
     validateRotation(webhook.secret.rotation);
   }
-  if (reconciliation.mode === "query") {
+  if (
+    reconciliation.mode === "query" ||
+    reconciliation.mode === "webhook-query"
+  ) {
     const { query } = reconciliation;
     if (!query.provider.trim() || !query.credentialAlias.trim())
       throw new Error(
@@ -248,12 +264,40 @@ const validateReconciliation = (descriptor: EffectAdapterDescriptor) => {
       throw new Error("Effect adapter query health duration must be positive");
     if (!validDuration(query.pollingIntervalMs))
       throw new Error("Effect adapter query polling interval must be positive");
+    if (typeof query.requiresReference !== "boolean")
+      throw new Error(
+        "Effect adapter query reference requirement must be explicit",
+      );
     validateRotation(query.rotation);
   }
+  if (
+    reconciliation.mode === "webhook-query" &&
+    reconciliation.webhook.provider !== reconciliation.query.provider
+  )
+    throw new Error(
+      "Effect adapter webhook and query providers must be identical",
+    );
 };
 
+export const effectAdapterQueryReconciliation = (
+  reconciliation: EffectAdapterReconciliation,
+) =>
+  reconciliation.mode === "query" || reconciliation.mode === "webhook-query"
+    ? reconciliation.query
+    : undefined;
+
+export const effectAdapterWebhookReconciliation = (
+  reconciliation: EffectAdapterReconciliation,
+) =>
+  reconciliation.mode === "webhook" || reconciliation.mode === "webhook-query"
+    ? reconciliation.webhook
+    : undefined;
+
 export const effectAdapterWebhookCallbackPath = (
-  reconciliation: Extract<EffectAdapterReconciliation, { mode: "webhook" }>,
+  reconciliation: Extract<
+    EffectAdapterReconciliation,
+    { webhook: EffectAdapterWebhookReconciliation }
+  >,
   tenantId: string,
 ) =>
   reconciliation.webhook.callback.pathTemplate.replace(

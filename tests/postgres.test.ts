@@ -67,6 +67,36 @@ describe("PostgreSQL effect store", () => {
     expect(calls[0]?.text).toContain("tenant_id = $5");
   });
 
+  test("quarantines only the exact attempt with a bounded provider reference", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const store = createPostgresEffectStore({
+      client: {
+        query: async <Row>(text: string, values?: readonly unknown[]) => {
+          calls.push({ text, values });
+          return { rows: [{ effect_id: "effect-1" } as Row] };
+        },
+      },
+    });
+    await store.quarantineUnknown(
+      "effect-1",
+      2,
+      {
+        error: "completion lease lost",
+        reconciliationReference: {
+          adapterId: "provider.adapter",
+          provider: "provider",
+          resourceId: "resource-1",
+        },
+      },
+      3,
+    );
+
+    expect(calls[0]?.text).toContain("attempts = $2");
+    expect(calls[0]?.text).toContain("status = 'leased'");
+    expect(calls[0]?.text).not.toContain("lease_owner = $2");
+    expect(String(calls[0]?.values?.[2])).toContain("resource-1");
+  });
+
   test("creates the effect and outbox event in one SQL statement", async () => {
     const calls: string[] = [];
     const client: ExecutionSqlClient = {

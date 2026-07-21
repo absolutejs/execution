@@ -119,6 +119,72 @@ describe("queue bridge and transactional outbox", () => {
     expect((await store.get("queued-1"))?.result).toEqual({ providerId: "p1" });
   });
 
+  test("atomically quarantines a lost completion with only its provider reference", async () => {
+    const retained = createMemoryEffectStore();
+    await retained.enqueue(effect("queued-uncertain"));
+    const store = {
+      ...retained,
+      succeed: async () => false,
+    };
+    const handler = createExecutionQueueHandler({
+      handlers: {
+        send: {
+          execute: async () => ({
+            adapterId: "provider.adapter",
+            effect: "message.send",
+            installationId: "installation-1",
+            output: { privateResponse: "never-retain-this" },
+            reconciliationReference: {
+              adapterId: "provider.adapter",
+              provider: "provider",
+              resourceId: "provider-resource-1",
+            },
+          }),
+        },
+      },
+      now: () => 2,
+      store,
+      workerId: "effect-uncertain",
+    });
+    await handler(
+      { effectId: "queued-uncertain" },
+      {
+        attempts: 0,
+        id: crypto.randomUUID(),
+        kind: "absolutejs.execution.effect",
+        maxAttempts: 5,
+        signal: new AbortController().signal,
+      },
+    );
+    const uncertain = await retained.get("queued-uncertain");
+    expect(uncertain?.status).toBe("unknown");
+    expect(uncertain?.reconciliationReference).toEqual({
+      adapterId: "provider.adapter",
+      provider: "provider",
+      resourceId: "provider-resource-1",
+    });
+    expect(JSON.stringify(uncertain)).not.toContain("never-retain-this");
+    expect(uncertain?.result).toBeUndefined();
+  });
+
+  test("a stale attempt cannot quarantine a newer execution lease", async () => {
+    const store = createMemoryEffectStore();
+    await store.enqueue(effect("stale-uncertain"));
+    const first = await store.claimEffect("stale-uncertain", "worker-1", 1, 1);
+    const second = await store.claimEffect("stale-uncertain", "worker-2", 1, 2);
+    expect(first?.attempts).toBe(1);
+    expect(second?.attempts).toBe(2);
+    expect(
+      await store.quarantineUnknown(
+        "stale-uncertain",
+        first!.attempts,
+        { error: "stale" },
+        3,
+      ),
+    ).toBe(false);
+    expect((await store.get("stale-uncertain"))?.status).toBe("leased");
+  });
+
   test("is structurally compatible with the real AbsoluteJS queue worker", async () => {
     const effects = createMemoryEffectStore();
     await effects.enqueue(effect("real-queue"));

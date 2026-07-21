@@ -22,11 +22,18 @@ export type EffectRecord = {
   inputDigest: string;
   leaseExpiresAt?: number;
   leaseOwner?: string;
+  reconciliationReference?: EffectProviderReconciliationReference;
   result?: unknown;
   status: EffectStatus;
   tenantId: string;
   updatedAt: number;
   runId?: string;
+};
+
+export type EffectProviderReconciliationReference = {
+  adapterId: string;
+  provider: string;
+  resourceId: string;
 };
 
 export type EffectAttemptKind = "execute" | "compensate";
@@ -110,6 +117,15 @@ export type EffectStore = {
       availableAt?: number;
       error: string;
       status: "pending" | "failed" | "unknown" | "dead_letter";
+    },
+    now: number,
+  ) => Promise<boolean>;
+  quarantineUnknown: (
+    effectId: string,
+    attempt: number,
+    update: {
+      error: string;
+      reconciliationReference?: EffectProviderReconciliationReference;
     },
     now: number,
   ) => Promise<boolean>;

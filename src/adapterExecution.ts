@@ -2,8 +2,15 @@ import type {
   EffectAdapterCredentialInstallation,
   EffectAdapterInstallationRegistry,
 } from "./adapterInstallations";
-import type { EffectAdapterDescriptor } from "./adapterRegistry";
-import type { EffectHandler, EffectHandlerContext } from "./types";
+import {
+  effectAdapterQueryReconciliation,
+  type EffectAdapterDescriptor,
+} from "./adapterRegistry";
+import type {
+  EffectHandler,
+  EffectHandlerContext,
+  EffectProviderReconciliationReference,
+} from "./types";
 
 export type EffectAdapterExecutionEnvelope<Input = unknown> = {
   destination?: string;
@@ -43,6 +50,10 @@ export type EffectAdapterDriver<Input = unknown, Output = unknown> = {
     input: Input,
     context: EffectAdapterDriverContext,
   ) => Promise<Output>;
+  reconciliationReference?: (
+    output: Output,
+    context: EffectAdapterDriverContext,
+  ) => Omit<EffectProviderReconciliationReference, "adapterId"> | undefined;
   version: string;
 };
 
@@ -52,6 +63,7 @@ export type EffectAdapterExecutionResult<Output = unknown> = {
   effect: string;
   installationId: string;
   output: Output;
+  reconciliationReference?: EffectProviderReconciliationReference;
 };
 
 export class EffectAdapterExecutionError extends Error {}
@@ -80,6 +92,40 @@ export const effectAdapterExecutionInputDigest = async (value: unknown) => {
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
+
+const REFERENCE_VALUE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/;
+const PROVIDER_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
+
+export const parseEffectProviderReconciliationReference = (
+  value: unknown,
+): EffectProviderReconciliationReference | undefined => {
+  if (value === undefined) return undefined;
+  if (
+    !record(value) ||
+    typeof value.adapterId !== "string" ||
+    !value.adapterId.trim() ||
+    typeof value.provider !== "string" ||
+    !PROVIDER_PATTERN.test(value.provider) ||
+    typeof value.resourceId !== "string" ||
+    !REFERENCE_VALUE_PATTERN.test(value.resourceId)
+  )
+    throw new EffectAdapterExecutionError(
+      "Provider reconciliation reference is invalid",
+    );
+
+  return {
+    adapterId: value.adapterId,
+    provider: value.provider,
+    resourceId: value.resourceId,
+  };
+};
+
+export const effectProviderReconciliationReferenceFromResult = (
+  value: unknown,
+) =>
+  record(value)
+    ? parseEffectProviderReconciliationReference(value.reconciliationReference)
+    : undefined;
 
 export const parseEffectAdapterExecutionEnvelope = (
   value: unknown,
@@ -242,7 +288,10 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
       tenantId: context.tenantId,
     });
 
-    return driverContext(context, input, credentials);
+    return {
+      authorization,
+      executionContext: driverContext(context, input, credentials),
+    };
   };
   const handler: EffectHandler = {
     execute: async (value, context) => {
@@ -255,10 +304,31 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
       const input = parseEffectAdapterExecutionEnvelope(
         value,
       ) as EffectAdapterExecutionEnvelope<Input>;
+      const { authorization, executionContext } = await prepare(input, context);
       const output = await options.driver.execute(
         input.payload,
-        await prepare(input, context),
+        executionContext,
       );
+      const reference = options.driver.reconciliationReference?.(
+        output,
+        executionContext,
+      );
+      const reconciliationReference = reference
+        ? parseEffectProviderReconciliationReference({
+            ...reference,
+            adapterId: options.driver.adapterId,
+          })
+        : undefined;
+      const query = effectAdapterQueryReconciliation(
+        authorization.adapter.reconciliation,
+      );
+      if (
+        reconciliationReference &&
+        (!query || reconciliationReference.provider !== query.provider)
+      )
+        throw new EffectAdapterExecutionError(
+          "Provider reconciliation reference is outside the descriptor contract",
+        );
 
       return {
         adapterId: options.driver.adapterId,
@@ -266,6 +336,7 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
         effect: input.effect,
         installationId: input.installationId,
         output,
+        ...(reconciliationReference ? { reconciliationReference } : {}),
       } satisfies EffectAdapterExecutionResult<Output>;
     },
   };
@@ -286,7 +357,7 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
       };
       await options.driver.compensate!(
         result.output,
-        await prepare(input, context),
+        (await prepare(input, context)).executionContext,
       );
     };
 

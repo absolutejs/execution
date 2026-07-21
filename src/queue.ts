@@ -1,4 +1,5 @@
 import { Type } from "@sinclair/typebox";
+import { effectProviderReconciliationReferenceFromResult } from "./adapterExecution";
 import { UnknownEffectOutcomeError } from "./worker";
 import type {
   EffectHandler,
@@ -97,8 +98,9 @@ export const createExecutionQueueHandler =
       );
       return;
     }
+    let result: unknown;
     try {
-      const result = await handler.execute(effect.input, {
+      result = await handler.execute(effect.input, {
         actionId: effect.actionId,
         effectId: effect.effectId,
         idempotencyKey: effect.idempotencyKey,
@@ -116,11 +118,17 @@ export const createExecutionQueueHandler =
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       if (error instanceof UnknownEffectOutcomeError) {
+        const reconciliationReference =
+          error.reconciliationReference ??
+          effectProviderReconciliationReferenceFromResult(result);
         await store.finishAttempt(attemptId, "unknown", now(), message);
-        await store.fail(
+        await store.quarantineUnknown(
           effectId,
-          workerId,
-          { error: message, status: "unknown" },
+          effect.attempts,
+          {
+            error: message,
+            ...(reconciliationReference ? { reconciliationReference } : {}),
+          },
           now(),
         );
         return;

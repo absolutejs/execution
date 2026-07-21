@@ -1,9 +1,22 @@
-import type { EffectHandler, EffectStore } from "./types";
+import type {
+  EffectHandler,
+  EffectProviderReconciliationReference,
+  EffectStore,
+} from "./types";
+import { effectProviderReconciliationReferenceFromResult } from "./adapterExecution";
 
 export class UnknownEffectOutcomeError extends Error {
-  constructor(message = "Provider outcome is unknown") {
+  readonly reconciliationReference?: EffectProviderReconciliationReference;
+
+  constructor(
+    message = "Provider outcome is unknown",
+    options?: {
+      reconciliationReference?: EffectProviderReconciliationReference;
+    },
+  ) {
     super(message);
     this.name = "UnknownEffectOutcomeError";
+    this.reconciliationReference = options?.reconciliationReference;
   }
 }
 
@@ -39,8 +52,9 @@ export const createEffectWorker = ({
       return effect.effectId;
     }
     const controller = new AbortController();
+    let result: unknown;
     try {
-      const result = await handler.execute(effect.input, {
+      result = await handler.execute(effect.input, {
         actionId: effect.actionId,
         effectId: effect.effectId,
         idempotencyKey: effect.idempotencyKey,
@@ -57,12 +71,25 @@ export const createEffectWorker = ({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Effect failed";
       const unknown = error instanceof UnknownEffectOutcomeError;
-      await store.fail(
-        effect.effectId,
-        workerId,
-        unknown
-          ? { error: message, status: "unknown" }
-          : effect.attempts >= maxAttempts
+      const reconciliationReference = unknown
+        ? (error.reconciliationReference ??
+          effectProviderReconciliationReferenceFromResult(result))
+        : undefined;
+      if (unknown)
+        await store.quarantineUnknown(
+          effect.effectId,
+          effect.attempts,
+          {
+            error: message,
+            ...(reconciliationReference ? { reconciliationReference } : {}),
+          },
+          now(),
+        );
+      else
+        await store.fail(
+          effect.effectId,
+          workerId,
+          effect.attempts >= maxAttempts
             ? { error: message, status: "dead_letter" }
             : {
                 availableAt:
@@ -70,8 +97,8 @@ export const createEffectWorker = ({
                 error: message,
                 status: "pending",
               },
-        now(),
-      );
+          now(),
+        );
     }
     return effect.effectId;
   },

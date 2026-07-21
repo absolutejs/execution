@@ -107,6 +107,17 @@ Operator-triggered owner flows must call `runOnce({ tenantId })`; the tenant
 filter is passed into the durable effect inventory before any lease,
 installation authorization, credential resolution, or provider query occurs.
 
+Adapters that use a signed webhook as the primary path and a provider query as
+a fallback declare `mode: "webhook-query"`. Query contracts explicitly state
+whether a provider reference is required. An execution driver may extract only
+the bounded `{ provider, resourceId }` reference from a successful provider
+result; Execution adds the certified adapter ID and never exposes the arbitrary
+result or original payload to a query driver. If local completion loses its
+lease, `quarantineUnknown()` compares the exact attempt number before retaining
+that reference. A stale worker therefore cannot overwrite a newer attempt or a
+terminal effect. Fallbacks that require a reference are skipped before
+credential resolution when an ambiguous provider call never returned one.
+
 `createManagedEffectReconciliationScheduler()` adds a durable, explicitly
 default-off control-plane schedule around that runtime. Its store retains the
 interval, next run, replica lease, bounded counters, and a safe error code. A

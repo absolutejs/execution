@@ -348,6 +348,22 @@ export const createPostgresEffectStore = ({
       );
       return result.rows[0] !== undefined;
     },
+    quarantineUnknown: async (effectId, attempt, update, now) => {
+      const dataUpdate = {
+        ...update,
+        status: "unknown",
+        updatedAt: now,
+      };
+      const result = await client.query<{ effect_id: string }>(
+        `UPDATE ${ns}.effects
+         SET status = 'unknown', data = (data - 'leaseOwner' - 'leaseExpiresAt') || $3::jsonb,
+             lease_owner = NULL, lease_expires_at = NULL, updated_at = $4
+         WHERE effect_id = $1 AND attempts = $2 AND status = 'leased'
+         RETURNING effect_id`,
+        [effectId, attempt, JSON.stringify(dataUpdate), now],
+      );
+      return result.rows[0] !== undefined;
+    },
     reconcile: async (effectId, update, now) => {
       const result = await client.query<{ effect_id: string }>(
         `UPDATE ${ns}.effects SET status = $2, data = data || $3::jsonb, updated_at = $4 WHERE effect_id = $1 AND status = 'unknown' RETURNING effect_id`,

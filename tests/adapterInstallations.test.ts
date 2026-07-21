@@ -48,6 +48,7 @@ const providerDescriptor = (): EffectAdapterDescriptor => ({
       },
       pollingIntervalMs: 60_000,
       provider: "provider",
+      requiresReference: false,
       rotation: { mode: "replace", verification: "successful-query" },
       supportedOutcomes: ["delivered", "failed"],
     },

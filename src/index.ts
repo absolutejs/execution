@@ -1,6 +1,7 @@
 export { createMemoryEffectStore } from "./memory";
 export {
   createEffectAdapterExecutionHandler,
+  effectAdapterExecutionInputDigest,
   EffectAdapterExecutionError,
   type EffectAdapterDriver,
   type EffectAdapterDriverCapabilities,

@@ -85,7 +85,8 @@ aliases and validating mandates; raw credentials never enter either registry.
 
 `createEffectAdapterExecutionHandler()` is the final provider boundary. It
 accepts an installation envelope, reauthorizes the exact tenant, effect,
-destination, and spend, verifies that the runtime driver's identity, version,
+destination, and spend, first recomputes the canonical authorized input digest,
+verifies that the runtime driver's identity, version,
 idempotency, reconciliation, and compensation capabilities match the certified
 descriptor, and only then resolves the authorized secret aliases. Credential
 values exist only in the driver context and are never placed in the durable

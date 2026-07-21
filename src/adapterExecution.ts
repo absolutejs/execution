@@ -56,6 +56,28 @@ export type EffectAdapterExecutionResult<Output = unknown> = {
 
 export class EffectAdapterExecutionError extends Error {}
 
+const normalize = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(normalize);
+  if (value !== null && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([, entry]) => entry !== undefined)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, entry]) => [key, normalize(entry)]),
+    );
+
+  return value;
+};
+
+export const effectAdapterExecutionInputDigest = async (value: unknown) => {
+  const encoded = new TextEncoder().encode(JSON.stringify(normalize(value)));
+  const result = await crypto.subtle.digest("SHA-256", encoded);
+
+  return [...new Uint8Array(result)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+};
+
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -222,6 +244,12 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
   };
   const handler: EffectHandler = {
     execute: async (value, context) => {
+      if (
+        (await effectAdapterExecutionInputDigest(value)) !== context.inputDigest
+      )
+        throw new EffectAdapterExecutionError(
+          "Installed adapter input differs from its authorized digest",
+        );
       const input = envelope(value) as EffectAdapterExecutionEnvelope<Input>;
       const output = await options.driver.execute(
         input.payload,

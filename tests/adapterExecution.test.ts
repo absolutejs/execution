@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createEffectAdapterExecutionHandler,
+  effectAdapterExecutionInputDigest,
   EffectAdapterExecutionError,
   UnknownEffectOutcomeError,
   type EffectAdapterDescriptor,
@@ -56,11 +57,11 @@ const authorization = {
   },
 };
 
-const context = (): EffectHandlerContext => ({
+const context = (inputDigest: string): EffectHandlerContext => ({
   actionId: "action-a",
   effectId: "effect-a",
   idempotencyKey: "stable-key",
-  inputDigest: "sha256:input",
+  inputDigest,
   signal: new AbortController().signal,
   tenantId: "tenant-a",
 });
@@ -71,6 +72,7 @@ const input = {
   installationId: "installation-a",
   payload: { subject: "hello" },
 };
+const INPUT_DIGEST = await effectAdapterExecutionInputDigest(input);
 
 const installationRegistry = (
   authorize: EffectAdapterInstallationRegistry["authorize"],
@@ -103,7 +105,9 @@ describe("installed effect adapter execution bridge", () => {
       },
     });
 
-    await expect(handler.execute(input, context())).rejects.toThrow("denied");
+    await expect(handler.execute(input, context(INPUT_DIGEST))).rejects.toThrow(
+      "denied",
+    );
     expect(resolutions).toBe(0);
   });
 
@@ -122,7 +126,7 @@ describe("installed effect adapter execution bridge", () => {
       },
     });
 
-    const result = await handler.execute(input, context());
+    const result = await handler.execute(input, context(INPUT_DIGEST));
     expect(resolved).toEqual(["PROJECT_API_TOKEN"]);
     expect(seen).toEqual(["credential-value"]);
     expect(JSON.stringify(result)).not.toContain("credential-value");
@@ -143,7 +147,7 @@ describe("installed effect adapter execution bridge", () => {
       resolveCredential: async () => "credential-value",
     });
 
-    await handler.execute(input, context());
+    await handler.execute(input, context(INPUT_DIGEST));
     expect(authorized).toEqual({
       destination: DESTINATION,
       effect: "message.send",
@@ -175,9 +179,9 @@ describe("installed effect adapter execution bridge", () => {
       },
     });
 
-    await expect(handler.execute(input, context())).rejects.toBeInstanceOf(
-      EffectAdapterExecutionError,
-    );
+    await expect(
+      handler.execute(input, context(INPUT_DIGEST)),
+    ).rejects.toBeInstanceOf(EffectAdapterExecutionError);
     expect(invoked).toBe(false);
     expect(resolutions).toBe(0);
   });
@@ -194,7 +198,10 @@ describe("installed effect adapter execution bridge", () => {
     });
 
     await expect(
-      handler.execute(input, { ...context(), idempotencyKey: "" }),
+      handler.execute(input, {
+        ...context(INPUT_DIGEST),
+        idempotencyKey: "",
+      }),
     ).rejects.toThrow("stable effect idempotency key");
     expect(resolutions).toBe(0);
   });
@@ -208,8 +215,33 @@ describe("installed effect adapter execution bridge", () => {
       resolveCredential: async () => "credential-value",
     });
 
-    await expect(handler.execute(input, context())).rejects.toBeInstanceOf(
-      UnknownEffectOutcomeError,
-    );
+    await expect(
+      handler.execute(input, context(INPUT_DIGEST)),
+    ).rejects.toBeInstanceOf(UnknownEffectOutcomeError);
+  });
+
+  test("rejects mutated input before authorization or credential resolution", async () => {
+    let authorizations = 0;
+    let resolutions = 0;
+    const handler = createEffectAdapterExecutionHandler({
+      driver: driver(),
+      installations: installationRegistry(async () => {
+        authorizations += 1;
+        return authorization;
+      }),
+      resolveCredential: async () => {
+        resolutions += 1;
+        return "credential-value";
+      },
+    });
+
+    await expect(
+      handler.execute(
+        { ...input, payload: { subject: "mutated" } },
+        context(INPUT_DIGEST),
+      ),
+    ).rejects.toThrow("authorized digest");
+    expect(authorizations).toBe(0);
+    expect(resolutions).toBe(0);
   });
 });

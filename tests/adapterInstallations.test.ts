@@ -126,6 +126,14 @@ describe("tenant effect adapter installations", () => {
     await expect(
       installations.enable("tenant-b", "installation-a"),
     ).rejects.toThrow("not found");
+    await expect(
+      installations.put({
+        adapterId: "simulation",
+        installationId: "installation-a",
+        policy: simulationPolicy,
+        tenantId: "tenant-b",
+      }),
+    ).rejects.toThrow("belongs to another tenant");
     await installations.enable("tenant-a", "installation-a");
     expect(
       (

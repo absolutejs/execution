@@ -198,20 +198,22 @@ const validatePolicy = (
 export const createMemoryEffectAdapterInstallationStore =
   (): EffectAdapterInstallationStore => {
     const records = new Map<string, EffectAdapterInstallationRecord>();
-    const key = (tenantId: string, installationId: string) =>
-      `${tenantId}\u0000${installationId}`;
     return {
-      get: async (tenantId, installationId) =>
-        records.get(key(tenantId, installationId)),
+      get: async (tenantId, installationId) => {
+        const record = records.get(installationId);
+        return record?.tenantId === tenantId ? record : undefined;
+      },
       list: async (input) =>
         [...records.values()].filter(
           ({ tenantId }) => !input?.tenantId || tenantId === input.tenantId,
         ),
       save: async (record) => {
-        records.set(
-          key(record.tenantId, record.installationId),
-          structuredClone(record),
-        );
+        const existing = records.get(record.installationId);
+        if (existing && existing.tenantId !== record.tenantId)
+          throw new EffectAdapterInstallationError(
+            "Installation identity belongs to another tenant",
+          );
+        records.set(record.installationId, structuredClone(record));
       },
     };
   };
@@ -293,19 +295,20 @@ export const createPostgresEffectAdapterInstallationStore = (options: {
       );
     },
     save: async (record) => {
-      await options.client.query(
+      const result = await options.client.query(
         `INSERT INTO ${namespace}.adapter_installations
           (installation_id, tenant_id, adapter_id, adapter_version, descriptor_digest, policy, enabled, installed_at, updated_at)
          VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
          ON CONFLICT (installation_id) DO UPDATE SET
-          tenant_id = excluded.tenant_id,
           adapter_id = excluded.adapter_id,
           adapter_version = excluded.adapter_version,
           descriptor_digest = excluded.descriptor_digest,
           policy = excluded.policy,
           enabled = excluded.enabled,
           installed_at = excluded.installed_at,
-          updated_at = excluded.updated_at`,
+          updated_at = excluded.updated_at
+         WHERE ${namespace}.adapter_installations.tenant_id = excluded.tenant_id
+         RETURNING installation_id`,
         [
           record.installationId,
           record.tenantId,
@@ -318,6 +321,10 @@ export const createPostgresEffectAdapterInstallationStore = (options: {
           record.updatedAt,
         ],
       );
+      if (result.rows.length !== 1)
+        throw new EffectAdapterInstallationError(
+          "Installation identity belongs to another tenant",
+        );
     },
   };
 };

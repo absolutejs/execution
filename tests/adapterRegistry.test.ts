@@ -176,5 +176,29 @@ describe("effect adapter certification registry", () => {
         },
       }),
     ).rejects.toThrow("relative template");
+    await expect(
+      registry.register({
+        ...descriptor(),
+        reconciliation: {
+          mode: "webhook",
+          webhook: {
+            callback: {
+              body: "raw",
+              mediaType: "application/json",
+              method: "POST",
+              pathTemplate: "/effects/{tenantId}/provider",
+              signatureHeaders: ["provider-signature"],
+            },
+            events: ["effect.completed"],
+            health: { strategy: "last-verified-event" },
+            provider: "provider",
+            secret: {
+              alias: "invalid-secret-alias",
+              rotation: { mode: "replace", verification: "signed-event" },
+            },
+          },
+        },
+      }),
+    ).rejects.toThrow("secret alias is invalid");
   });
 });

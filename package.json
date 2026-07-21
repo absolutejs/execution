@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/execution",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "description": "Crash-safe external effect execution for AI agents with a transactional outbox, queue integration, reconciliation, and compensation.",
   "type": "module",
   "license": "MIT",

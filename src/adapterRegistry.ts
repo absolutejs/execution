@@ -128,6 +128,7 @@ export class EffectAdapterActivationError extends Error {}
 
 const DEFAULT_CERTIFICATE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
 const REQUIRED_PROFILE = "absolutejs-agent-first-1";
+const SECRET_ALIAS_PATTERN = /^[A-Z][A-Z0-9_]{0,63}$/;
 const REQUIRED_SUITES = [
   "agent-durable-execution-boundary",
   "agent-effect-adapter-registry",
@@ -210,10 +211,10 @@ const validateReconciliation = (descriptor: EffectAdapterDescriptor) => {
       throw new Error(
         "Effect adapter webhook events must be non-empty and unique",
       );
-    if (!webhook.provider.trim() || !webhook.secret.alias.trim())
-      throw new Error(
-        "Effect adapter webhook provider and secret alias are required",
-      );
+    if (!webhook.provider.trim())
+      throw new Error("Effect adapter webhook provider is required");
+    if (!SECRET_ALIAS_PATTERN.test(webhook.secret.alias))
+      throw new Error("Effect adapter webhook secret alias is invalid");
     if (
       webhook.health.staleAfterMs !== undefined &&
       !validDuration(webhook.health.staleAfterMs)

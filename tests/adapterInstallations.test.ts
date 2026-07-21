@@ -175,9 +175,17 @@ describe("tenant effect adapter installations", () => {
       store: createMemoryEffectAdapterInstallationStore(),
       verifyCredentialAlias: async (tenantId, alias) =>
         tenantId === "tenant-a" && alias === "PROJECT_PROVIDER_TOKEN",
-      verifyMandate: async ({ amountMinor, mandateId, tenantId }) =>
+      verifyMandate: async ({
+        amountMinor,
+        destination,
+        effect,
+        mandateId,
+        tenantId,
+      }) =>
         tenantId === "tenant-a" &&
         mandateId === "mandate-a" &&
+        effect === "message.send" &&
+        destination === "https://api.example.test" &&
         amountMinor <= 500,
     });
     const policy = {

@@ -189,6 +189,10 @@ const validatePolicy = (
     throw new EffectAdapterInstallationError(
       "Installation spend authority requires a mandate",
     );
+  if (policy.effects.length !== 1 || policy.destinations.length > 1)
+    throw new EffectAdapterInstallationError(
+      "Spending installations require one exact effect and destination scope",
+    );
 };
 
 export const createMemoryEffectAdapterInstallationStore =
@@ -330,6 +334,8 @@ export const createEffectAdapterInstallationRegistry = (options: {
     adapterId: string;
     amountMinor: number;
     currency: string;
+    destination?: string;
+    effect: string;
     mandateId: string;
     tenantId: string;
   }) => boolean | Promise<boolean>;
@@ -377,6 +383,10 @@ export const createEffectAdapterInstallationRegistry = (options: {
         adapterId: record.adapterId,
         amountMinor: maxMinorPerEffect,
         currency,
+        ...(record.policy.destinations[0]
+          ? { destination: record.policy.destinations[0] }
+          : {}),
+        effect: record.policy.effects[0]!,
         mandateId,
         tenantId: record.tenantId,
       }))
@@ -448,6 +458,8 @@ export const createEffectAdapterInstallationRegistry = (options: {
             adapterId: record.adapterId,
             amountMinor: spendMinor,
             currency,
+            ...(input.destination ? { destination: input.destination } : {}),
+            effect: input.effect,
             mandateId,
             tenantId: record.tenantId,
           }))
@@ -505,6 +517,10 @@ export const createEffectAdapterInstallationRegistry = (options: {
           adapterId: input.adapterId,
           amountMinor: maxMinorPerEffect,
           currency,
+          ...(input.policy.destinations[0]
+            ? { destination: input.policy.destinations[0] }
+            : {}),
+          effect: input.policy.effects[0]!,
           mandateId,
           tenantId: input.tenantId,
         }))

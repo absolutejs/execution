@@ -71,6 +71,7 @@ export {
   type EffectAdapterHealthStore,
   type EffectAdapterQueryDriver,
   type EffectAdapterQueryResult,
+  type EffectAdapterReconciliationRunInput,
   type EffectReconciliationLeaseStore,
 } from "./reconciliation";
 export {

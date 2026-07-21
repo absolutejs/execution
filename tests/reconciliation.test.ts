@@ -66,6 +66,7 @@ const setup = (options?: { fail?: boolean }) => {
   const healthStore = createMemoryEffectAdapterHealthStore();
   const evidence: unknown[] = [];
   let queries = 0;
+  const listInputs: unknown[] = [];
   const runtime = createEffectAdapterReconciliationRuntime({
     drivers: [
       {
@@ -89,7 +90,12 @@ const setup = (options?: { fail?: boolean }) => {
         version: descriptor.version,
       },
     ],
-    effects: { list: async () => [effect] },
+    effects: {
+      list: async (input) => {
+        listInputs.push(input);
+        return [effect];
+      },
+    },
     health: createEffectAdapterHealthOperations({
       now: () => NOW,
       store: healthStore,
@@ -142,7 +148,14 @@ const setup = (options?: { fail?: boolean }) => {
     },
     workerId: "worker-1",
   });
-  return { evidence, events, healthStore, queries: () => queries, runtime };
+  return {
+    evidence,
+    events,
+    healthStore,
+    listInputs,
+    queries: () => queries,
+    runtime,
+  };
 };
 
 describe("effect adapter reconciliation runtime", () => {
@@ -168,6 +181,19 @@ describe("effect adapter reconciliation runtime", () => {
   test("a shared lease prevents replicas from querying one effect twice", async () => {
     const harness = setup();
     await Promise.all([harness.runtime.runOnce(), harness.runtime.runOnce()]);
+    expect(harness.queries()).toBe(1);
+  });
+
+  test("passes an exact tenant fence into inventory before querying", async () => {
+    const harness = setup();
+    await harness.runtime.runOnce({ tenantId: "tenant-1" });
+    expect(harness.listInputs).toEqual([
+      { limit: 10, status: "unknown", tenantId: "tenant-1" },
+    ]);
+    expect(harness.queries()).toBe(1);
+    await expect(harness.runtime.runOnce({ tenantId: "   " })).rejects.toThrow(
+      "tenantId is required",
+    );
     expect(harness.queries()).toBe(1);
   });
 

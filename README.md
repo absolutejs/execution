@@ -103,6 +103,9 @@ Use `createPostgresEffectReconciliationLeaseStore()` and
 `effectAdapterReconciliationPostgresSchemaSql()`. Health is a bounded upserted
 signal containing safe codes and counters; raw provider errors and credentials
 are never retained.
+Operator-triggered owner flows must call `runOnce({ tenantId })`; the tenant
+filter is passed into the durable effect inventory before any lease,
+installation authorization, credential resolution, or provider query occurs.
 
 `createEffectAdapterInstallationRegistry()` narrows that certified authority for
 one tenant. Every installation pins the adapter version and digest, starts

@@ -60,6 +60,10 @@ export type EffectReconciliationLeaseStore = {
   }) => Promise<boolean>;
 };
 
+export type EffectAdapterReconciliationRunInput = {
+  tenantId?: string;
+};
+
 export type EffectAdapterQueryResult =
   | { status: "pending" }
   | {
@@ -598,10 +602,15 @@ export const createEffectAdapterReconciliationRuntime = (options: {
   };
 
   return {
-    runOnce: async () => {
+    runOnce: async (input: EffectAdapterReconciliationRunInput = {}) => {
+      const tenantId =
+        input.tenantId === undefined
+          ? undefined
+          : required(input.tenantId, "tenantId");
       const effects = await options.effects.list({
         limit: options.limit,
         status: "unknown",
+        ...(tenantId === undefined ? {} : { tenantId }),
       });
       const outcomes = [];
       for (const effect of effects) outcomes.push(await reconcile(effect));

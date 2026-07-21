@@ -2,6 +2,8 @@ import type {
   EffectAttempt,
   EffectOutboxRecord,
   EffectRecord,
+  EffectReconciliationRecord,
+  EffectRecoveryStore,
   EffectStore,
 } from "./types";
 
@@ -76,6 +78,22 @@ CREATE INDEX IF NOT EXISTS effects_tenant_inventory_idx ON ${ns}.effects (tenant
 CREATE INDEX IF NOT EXISTS effects_run_inventory_idx ON ${ns}.effects (run_id, created_at DESC);`;
 };
 
+export const effectRecoveryPostgresSchemaSql = (namespace = "execution") => {
+  const ns = namespaceOf(namespace);
+  return `CREATE TABLE IF NOT EXISTS ${ns}.effect_reconciliations (
+  reconciliation_id text PRIMARY KEY,
+  effect_id text NOT NULL REFERENCES ${ns}.effects(effect_id) ON DELETE CASCADE,
+  tenant_id text NOT NULL,
+  actor_id text NOT NULL,
+  source text NOT NULL,
+  resolution text NOT NULL,
+  evidence_reference text NOT NULL,
+  note text NOT NULL,
+  created_at bigint NOT NULL
+);
+CREATE INDEX IF NOT EXISTS effect_reconciliations_effect_idx ON ${ns}.effect_reconciliations (effect_id, created_at);`;
+};
+
 type EffectRow = {
   attempts: number;
   data: EffectRecord | string;
@@ -93,7 +111,7 @@ export const createPostgresEffectStore = ({
 }: {
   client: ExecutionSqlClient;
   namespace?: string;
-}): EffectStore => {
+}): EffectStore & EffectRecoveryStore => {
   const ns = namespaceOf(namespace);
   const effectUpdate = async (
     effectId: string,
@@ -280,6 +298,33 @@ export const createPostgresEffectStore = ({
         workerId: row.worker_id,
       }));
     },
+    listReconciliations: async (effectId) => {
+      const result = await client.query<{
+        actor_id: string;
+        created_at: number | string;
+        effect_id: string;
+        evidence_reference: string;
+        note: string;
+        reconciliation_id: string;
+        resolution: EffectReconciliationRecord["resolution"];
+        source: EffectReconciliationRecord["source"];
+        tenant_id: string;
+      }>(
+        `SELECT reconciliation_id, effect_id, tenant_id, actor_id, source, resolution, evidence_reference, note, created_at FROM ${ns}.effect_reconciliations WHERE effect_id = $1 ORDER BY created_at, reconciliation_id`,
+        [effectId],
+      );
+      return result.rows.map((row) => ({
+        actorId: row.actor_id,
+        createdAt: Number(row.created_at),
+        effectId: row.effect_id,
+        evidenceReference: row.evidence_reference,
+        note: row.note,
+        reconciliationId: row.reconciliation_id,
+        resolution: row.resolution,
+        source: row.source,
+        tenantId: row.tenant_id,
+      }));
+    },
     list: async (input) => {
       const result = await client.query<EffectRow>(
         `SELECT data, attempts FROM ${ns}.effects
@@ -311,6 +356,42 @@ export const createPostgresEffectStore = ({
           update.status,
           JSON.stringify({ ...update, updatedAt: now }),
           now,
+        ],
+      );
+      return result.rows[0] !== undefined;
+    },
+    resolveUnknown: async ({
+      effectId,
+      reconciliation,
+      status,
+      updatedAt,
+      ...update
+    }) => {
+      const result = await client.query<{ effect_id: string }>(
+        `WITH updated AS (
+          UPDATE ${ns}.effects
+          SET status = $2,
+              data = (data - 'error' - 'result') || $3::jsonb,
+              updated_at = $4
+          WHERE effect_id = $1 AND tenant_id = $5 AND status = 'unknown'
+          RETURNING effect_id
+        )
+        INSERT INTO ${ns}.effect_reconciliations
+          (reconciliation_id, effect_id, tenant_id, actor_id, source, resolution, evidence_reference, note, created_at)
+        SELECT $6, effect_id, $5, $7, $8, $9, $10, $11, $4 FROM updated
+        RETURNING effect_id`,
+        [
+          effectId,
+          status,
+          JSON.stringify({ ...update, status, updatedAt }),
+          updatedAt,
+          reconciliation.tenantId,
+          reconciliation.reconciliationId,
+          reconciliation.actorId,
+          reconciliation.source,
+          reconciliation.resolution,
+          reconciliation.evidenceReference,
+          reconciliation.note,
         ],
       );
       return result.rows[0] !== undefined;

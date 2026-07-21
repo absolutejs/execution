@@ -51,8 +51,13 @@ const worker = createQueueWorker({ registry, store: queueStore });
 
 If a provider times out after accepting a request, throw
 `UnknownEffectOutcomeError`. Execution will not retry blindly: it quarantines
-the effect as `unknown` until an operator or provider webhook calls
-`store.reconcile(...)`. Successful effects can be reversed explicitly with
+the effect as `unknown` until an authorized operator, provider query, or
+provider webhook resolves it through `createEffectRecoveryOperations()`.
+Recovery verifies evidence before one atomic status transition, retains an
+append-only actor/source/evidence record, tenant-fences every case, and permits
+retry only when evidence confirms the provider did not apply the effect. Apply
+`effectRecoveryPostgresSchemaSql()` before using the PostgreSQL recovery API.
+Successful effects can be reversed explicitly with
 `compensateEffect()` when the handler provides `compensate`.
 
 Agent Runtime hosts should use `createAgentRuntimeEffectExecutor()` rather than

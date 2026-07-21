@@ -42,11 +42,18 @@ export {
 } from "./adapterRegistry";
 export {
   createPostgresEffectStore,
+  effectRecoveryPostgresSchemaSql,
   executionPostgresSchemaSql,
   executionTenantInventoryPostgresSchemaSql,
   type ExecutionSqlClient,
   type ExecutionSqlResult,
 } from "./postgres";
+export {
+  createEffectRecoveryOperations,
+  EffectRecoveryError,
+  type EffectRecoveryCase,
+  type EffectRecoveryRequest,
+} from "./recovery";
 export {
   compensateEffect,
   createExecutionOutboxDispatcher,
@@ -66,6 +73,10 @@ export type {
   EffectHandlerContext,
   EffectOutboxRecord,
   EffectRecord,
+  EffectReconciliationRecord,
+  EffectReconciliationResolution,
+  EffectReconciliationSource,
+  EffectRecoveryStore,
   EffectStatus,
   EffectStore,
   ExecutionJobs,

@@ -48,6 +48,28 @@ export type EffectAttempt = {
   workerId: string;
 };
 
+export type EffectReconciliationResolution =
+  | "confirmed_succeeded"
+  | "confirmed_not_applied"
+  | "dead_letter";
+
+export type EffectReconciliationSource =
+  | "operator"
+  | "provider_query"
+  | "provider_webhook";
+
+export type EffectReconciliationRecord = {
+  actorId: string;
+  createdAt: number;
+  effectId: string;
+  evidenceReference: string;
+  note: string;
+  reconciliationId: string;
+  resolution: EffectReconciliationResolution;
+  source: EffectReconciliationSource;
+  tenantId: string;
+};
+
 export type EffectOutboxRecord = {
   attempts: number;
   effectId: string;
@@ -137,6 +159,23 @@ export type EffectStore = {
     now: number,
     error?: string,
   ) => Promise<boolean>;
+};
+
+export type EffectRecoveryStore = Pick<
+  EffectStore,
+  "get" | "list" | "listAttempts"
+> & {
+  listReconciliations: (
+    effectId: string,
+  ) => Promise<EffectReconciliationRecord[]>;
+  resolveUnknown: (input: {
+    effectId: string;
+    error?: string;
+    reconciliation: EffectReconciliationRecord;
+    result?: unknown;
+    status: "pending" | "succeeded" | "dead_letter";
+    updatedAt: number;
+  }) => Promise<boolean>;
 };
 
 export type EffectHandler = {

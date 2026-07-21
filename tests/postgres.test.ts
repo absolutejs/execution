@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import {
   createPostgresEffectStore,
+  effectRecoveryPostgresSchemaSql,
   executionPostgresSchemaSql,
   executionTenantInventoryPostgresSchemaSql,
   type EffectRecord,
@@ -20,6 +21,49 @@ describe("PostgreSQL effect store", () => {
     expect(sql).toContain("tenant_id");
     expect(sql).toContain("effects_tenant_idempotency_idx");
     expect(sql).toContain("DROP CONSTRAINT IF EXISTS");
+  });
+
+  test("ships append-only effect reconciliation history", () => {
+    const sql = effectRecoveryPostgresSchemaSql();
+    expect(sql).toContain("effect_reconciliations");
+    expect(sql).toContain("evidence_reference");
+    expect(() => effectRecoveryPostgresSchemaSql("bad-name")).toThrow();
+  });
+
+  test("resolves an unknown effect and records evidence atomically", async () => {
+    const calls: Array<{ text: string; values?: readonly unknown[] }> = [];
+    const store = createPostgresEffectStore({
+      client: {
+        query: async <Row>(text: string, values?: readonly unknown[]) => {
+          calls.push({ text, values });
+          return { rows: [{ effect_id: "effect-1" } as Row] };
+        },
+      },
+    });
+
+    expect(
+      await store.resolveUnknown({
+        effectId: "effect-1",
+        reconciliation: {
+          actorId: "admin-1",
+          createdAt: 2,
+          effectId: "effect-1",
+          evidenceReference: "provider:event-1",
+          note: "Verified in the provider ledger",
+          reconciliationId: "reconciliation-1",
+          resolution: "confirmed_succeeded",
+          source: "operator",
+          tenantId: "tenant-1",
+        },
+        result: { evidenceReference: "provider:event-1" },
+        status: "succeeded",
+        updatedAt: 2,
+      }),
+    ).toBe(true);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.text).toContain("WITH updated AS");
+    expect(calls[0]?.text).toContain("effect_reconciliations");
+    expect(calls[0]?.text).toContain("tenant_id = $5");
   });
 
   test("creates the effect and outbox event in one SQL statement", async () => {

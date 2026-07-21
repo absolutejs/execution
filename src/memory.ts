@@ -2,13 +2,17 @@ import type {
   EffectAttempt,
   EffectOutboxRecord,
   EffectRecord,
+  EffectReconciliationRecord,
+  EffectRecoveryStore,
   EffectStore,
 } from "./types";
 
-export const createMemoryEffectStore = (): EffectStore => {
+export const createMemoryEffectStore = (): EffectStore &
+  EffectRecoveryStore => {
   const rows = new Map<string, EffectRecord>();
   const outbox = new Map<string, EffectOutboxRecord>();
   const attempts = new Map<string, EffectAttempt>();
+  const reconciliations = new Map<string, EffectReconciliationRecord>();
   let tail = Promise.resolve();
   const locked = async <T>(run: () => T | Promise<T>) => {
     const previous = tail;
@@ -183,6 +187,11 @@ export const createMemoryEffectStore = (): EffectStore => {
         .filter((attempt) => attempt.effectId === effectId)
         .sort((left, right) => left.startedAt - right.startedAt)
         .map((attempt) => structuredClone(attempt)),
+    listReconciliations: async (effectId) =>
+      [...reconciliations.values()]
+        .filter((reconciliation) => reconciliation.effectId === effectId)
+        .sort((left, right) => left.createdAt - right.createdAt)
+        .map((reconciliation) => structuredClone(reconciliation)),
     list: async (input) =>
       [...rows.values()]
         .filter(
@@ -206,6 +215,28 @@ export const createMemoryEffectStore = (): EffectStore => {
         const row = rows.get(effectId);
         if (!row || row.status !== "unknown") return false;
         rows.set(effectId, { ...row, ...update, updatedAt: now });
+        return true;
+      }),
+    resolveUnknown: ({
+      effectId,
+      reconciliation,
+      status,
+      updatedAt,
+      ...update
+    }) =>
+      locked(() => {
+        const row = rows.get(effectId);
+        if (!row || row.status !== "unknown") return false;
+        rows.set(effectId, {
+          ...row,
+          ...update,
+          status,
+          updatedAt,
+        });
+        reconciliations.set(
+          reconciliation.reconciliationId,
+          structuredClone(reconciliation),
+        );
         return true;
       }),
     recordAttempt: (attempt) =>

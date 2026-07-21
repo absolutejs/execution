@@ -32,6 +32,7 @@ export type EffectAdapterReconciliation =
           staleAfterMs: number;
           strategy: "last-successful-query";
         };
+        pollingIntervalMs: number;
         provider: string;
         rotation: EffectAdapterSecretRotation;
         supportedOutcomes: ReadonlyArray<string>;
@@ -134,6 +135,7 @@ const REQUIRED_SUITES = [
   "agent-effect-adapter-registry",
   "agent-effect-adapter-installations",
   "agent-effect-adapter-execution",
+  "agent-effect-reconciliation-runtime",
 ] as const;
 
 const stable = (value: unknown): string =>
@@ -244,6 +246,8 @@ const validateReconciliation = (descriptor: EffectAdapterDescriptor) => {
       );
     if (!validDuration(query.health.staleAfterMs))
       throw new Error("Effect adapter query health duration must be positive");
+    if (!validDuration(query.pollingIntervalMs))
+      throw new Error("Effect adapter query polling interval must be positive");
     validateRotation(query.rotation);
   }
 };

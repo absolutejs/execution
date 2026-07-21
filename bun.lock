@@ -9,7 +9,7 @@
         "@sinclair/typebox": "^0.34.0",
       },
       "devDependencies": {
-        "@absolutejs/agent-conformance": "^0.11.0",
+        "@absolutejs/agent-conformance": "^0.12.0",
         "@absolutejs/agent-runtime": "^0.2.1",
         "@absolutejs/queue": "^0.4.1",
         "@types/bun": "^1.3.14",
@@ -22,7 +22,7 @@
     },
   },
   "packages": {
-    "@absolutejs/agent-conformance": ["@absolutejs/agent-conformance@0.11.0", "", { "dependencies": { "@absolutejs/manifest": "^0.3.0", "@sinclair/typebox": "^0.34.0" } }, "sha512-Dl0jrzf8K0Foe2XPiDXGSPf2PFXMfJouR9oAKS8sfevATRfmdNJKb8HSx5z5RTsyb84uGBe09Qeewj/Avg8geA=="],
+    "@absolutejs/agent-conformance": ["@absolutejs/agent-conformance@0.12.0", "", { "dependencies": { "@absolutejs/manifest": "^0.3.0", "@sinclair/typebox": "^0.34.0" } }, "sha512-+iUwCVjBensw1iEvPHCcsChIw8UHa0cSBlBYE371YxW+GpFlfdWVYMgjmGUxoyjq4wHmTezt6cErVSmSQK/wwg=="],
 
     "@absolutejs/agent-runtime": ["@absolutejs/agent-runtime@0.2.1", "", { "dependencies": { "@absolutejs/manifest": "^0.3.0", "@sinclair/typebox": "^0.34.0" } }, "sha512-t8Ka2t8Kff/vQK+gfevw96ydCAvmYNOur3yIte1L1H+4aaA8td9pjwgGFhss4XbOjqIIg8HNWk6YjbTb9NARZA=="],
 

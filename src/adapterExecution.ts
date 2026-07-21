@@ -81,7 +81,9 @@ export const effectAdapterExecutionInputDigest = async (value: unknown) => {
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const envelope = (value: unknown): EffectAdapterExecutionEnvelope => {
+export const parseEffectAdapterExecutionEnvelope = (
+  value: unknown,
+): EffectAdapterExecutionEnvelope => {
   if (
     !record(value) ||
     typeof value.installationId !== "string" ||
@@ -250,7 +252,9 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
         throw new EffectAdapterExecutionError(
           "Installed adapter input differs from its authorized digest",
         );
-      const input = envelope(value) as EffectAdapterExecutionEnvelope<Input>;
+      const input = parseEffectAdapterExecutionEnvelope(
+        value,
+      ) as EffectAdapterExecutionEnvelope<Input>;
       const output = await options.driver.execute(
         input.payload,
         await prepare(input, context),

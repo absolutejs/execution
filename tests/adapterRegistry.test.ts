@@ -61,6 +61,17 @@ const certificate = async (
         ],
         suite: "agent-effect-adapter-execution",
       },
+      {
+        failed: 0,
+        passed: 1,
+        results: [
+          {
+            name: "reconciliation-runtime/authorization-before-query-credentials",
+            passed: true,
+          },
+        ],
+        suite: "agent-effect-reconciliation-runtime",
+      },
     ],
     subject: { name: value.adapterId, version: value.version },
   }),

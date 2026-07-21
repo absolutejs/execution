@@ -88,10 +88,21 @@ Webhook reconciliation descriptors must also declare their relative
 `{tenantId}` callback template, raw-body signature headers, project secret
 alias, provider event set, health signal, and replacement or overlap rotation
 behavior. Query reconciliation descriptors bind their provider query to a
-declared credential slot and declare outcomes, health freshness, and rotation
-verification. Registration rejects incomplete or unsafe setup, and
+declared credential slot and declare outcomes, polling cadence, health
+freshness, and rotation verification. Registration rejects incomplete or unsafe setup, and
 `effectAdapterWebhookCallbackPath()` renders a tenant-safe callback without
 provider-specific host branching.
+
+`createEffectAdapterReconciliationRuntime()` scans quarantined effects and
+claims a durable per-effect lease before any provider query. It authorizes the
+tenant installation before resolving the exact credential alias, gives query
+drivers only effect identity metadata rather than the original payload, and
+passes normalized evidence back through `createEffectEvidenceIngestion()`.
+Use `createPostgresEffectReconciliationLeaseStore()` and
+`createPostgresEffectAdapterHealthStore()` after applying
+`effectAdapterReconciliationPostgresSchemaSql()`. Health is a bounded upserted
+signal containing safe codes and counters; raw provider errors and credentials
+are never retained.
 
 `createEffectAdapterInstallationRegistry()` narrows that certified authority for
 one tenant. Every installation pins the adapter version and digest, starts

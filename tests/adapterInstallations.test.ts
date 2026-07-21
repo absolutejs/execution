@@ -46,6 +46,7 @@ const providerDescriptor = (): EffectAdapterDescriptor => ({
         staleAfterMs: 15 * 60 * 1_000,
         strategy: "last-successful-query",
       },
+      pollingIntervalMs: 60_000,
       provider: "provider",
       rotation: { mode: "replace", verification: "successful-query" },
       supportedOutcomes: ["delivered", "failed"],
@@ -96,6 +97,17 @@ const certification = async (descriptor: EffectAdapterDescriptor) => ({
           },
         ],
         suite: "agent-effect-adapter-execution",
+      },
+      {
+        failed: 0,
+        passed: 1,
+        results: [
+          {
+            name: "reconciliation-runtime/authorization-before-query-credentials",
+            passed: true,
+          },
+        ],
+        suite: "agent-effect-reconciliation-runtime",
       },
     ],
     subject: { name: descriptor.adapterId, version: descriptor.version },

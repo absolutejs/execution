@@ -1,6 +1,10 @@
 import type { ExecutionSqlClient } from "./postgres";
 
-export type EffectEvidenceOutcome = "confirmed_succeeded" | "dead_letter";
+export type EffectEvidenceOutcome =
+  | "confirmed_not_applied"
+  | "confirmed_succeeded"
+  | "dead_letter";
+export type EffectEvidenceSource = "provider_query" | "provider_webhook";
 
 export type EffectEvidenceRecord = {
   deliveryId: string;
@@ -52,10 +56,14 @@ export const createEffectEvidenceIngestion = (options: {
   authorize: (evidence: EffectEvidenceRecord) => Promise<boolean>;
   reconcile: (
     evidence: EffectEvidenceRecord,
+    source: EffectEvidenceSource,
   ) => Promise<"already_terminal" | "resolved">;
   store: EffectEvidenceStore;
 }) => ({
-  ingest: async (input: EffectEvidenceRecord) => {
+  ingest: async (
+    input: EffectEvidenceRecord,
+    source: EffectEvidenceSource = "provider_webhook",
+  ) => {
     const evidence = validated(input);
     if (!(await options.authorize(evidence)))
       throw new EffectEvidenceError(
@@ -79,7 +87,7 @@ export const createEffectEvidenceIngestion = (options: {
     return {
       duplicate: !inserted,
       evidence: retained,
-      reconciliation: await options.reconcile(retained),
+      reconciliation: await options.reconcile(retained, source),
     };
   },
 });

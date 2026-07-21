@@ -7,11 +7,13 @@ export {
   EffectEvidenceError,
   type EffectEvidenceOutcome,
   type EffectEvidenceRecord,
+  type EffectEvidenceSource,
   type EffectEvidenceStore,
 } from "./evidence";
 export {
   createEffectAdapterExecutionHandler,
   effectAdapterExecutionInputDigest,
+  parseEffectAdapterExecutionEnvelope,
   EffectAdapterExecutionError,
   type EffectAdapterDriver,
   type EffectAdapterDriverCapabilities,
@@ -53,6 +55,24 @@ export {
   type EffectAdapterRegistryStore,
   type EffectAdapterSecretRotation,
 } from "./adapterRegistry";
+export {
+  createEffectAdapterHealthOperations,
+  createEffectAdapterReconciliationRuntime,
+  createMemoryEffectAdapterHealthStore,
+  createMemoryEffectReconciliationLeaseStore,
+  createPostgresEffectAdapterHealthStore,
+  createPostgresEffectReconciliationLeaseStore,
+  effectAdapterReconciliationPostgresSchemaSql,
+  EffectAdapterReconciliationError,
+  type EffectAdapterHealthObservation,
+  type EffectAdapterHealthRecord,
+  type EffectAdapterHealthSignal,
+  type EffectAdapterHealthStatus,
+  type EffectAdapterHealthStore,
+  type EffectAdapterQueryDriver,
+  type EffectAdapterQueryResult,
+  type EffectReconciliationLeaseStore,
+} from "./reconciliation";
 export {
   createPostgresEffectStore,
   effectRecoveryPostgresSchemaSql,

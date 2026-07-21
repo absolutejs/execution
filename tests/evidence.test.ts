@@ -26,6 +26,7 @@ describe("effect evidence ingestion", () => {
     const store = createMemoryEffectEvidenceStore();
     let reconciliations = 0;
     const ingestion = createEffectEvidenceIngestion({
+      authorize: async () => true,
       reconcile: async () => {
         reconciliations += 1;
         return reconciliations === 1 ? "resolved" : "already_terminal";
@@ -41,6 +42,7 @@ describe("effect evidence ingestion", () => {
   test("rejects a duplicate delivery rebound to another effect", async () => {
     const store = createMemoryEffectEvidenceStore();
     const ingestion = createEffectEvidenceIngestion({
+      authorize: async () => true,
       reconcile: async () => "resolved",
       store,
     });
@@ -48,6 +50,19 @@ describe("effect evidence ingestion", () => {
     await expect(ingestion.ingest(evidence("effect-b"))).rejects.toBeInstanceOf(
       EffectEvidenceError,
     );
+  });
+
+  test("authorizes tenant and effect binding before persistence", async () => {
+    const store = createMemoryEffectEvidenceStore();
+    const ingestion = createEffectEvidenceIngestion({
+      authorize: async () => false,
+      reconcile: async () => "resolved",
+      store,
+    });
+    await expect(ingestion.ingest(evidence())).rejects.toBeInstanceOf(
+      EffectEvidenceError,
+    );
+    expect(await store.list({ limit: 10 })).toHaveLength(0);
   });
 
   test("ships a normalized evidence schema without raw payload storage", () => {

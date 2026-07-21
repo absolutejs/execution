@@ -49,6 +49,7 @@ const validated = (evidence: EffectEvidenceRecord): EffectEvidenceRecord => ({
 });
 
 export const createEffectEvidenceIngestion = (options: {
+  authorize: (evidence: EffectEvidenceRecord) => Promise<boolean>;
   reconcile: (
     evidence: EffectEvidenceRecord,
   ) => Promise<"already_terminal" | "resolved">;
@@ -56,6 +57,10 @@ export const createEffectEvidenceIngestion = (options: {
 }) => ({
   ingest: async (input: EffectEvidenceRecord) => {
     const evidence = validated(input);
+    if (!(await options.authorize(evidence)))
+      throw new EffectEvidenceError(
+        "Effect evidence binding is not authorized",
+      );
     const inserted = await options.store.put(evidence);
     const retained = inserted
       ? evidence

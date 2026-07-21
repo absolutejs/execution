@@ -64,7 +64,8 @@ Successful effects can be reversed explicitly with
 
 Verified provider webhooks and query results can enter recovery through
 `createEffectEvidenceIngestion()`. The ingestion boundary retains only
-normalized, tenant-bound evidence, deduplicates provider delivery IDs, rejects
+normalized, tenant-bound evidence, authorizes that binding before persistence,
+deduplicates provider delivery IDs, rejects
 attempts to rebind an existing delivery to another effect, and resumes
 reconciliation when a provider retries after a host crash. Production hosts
 should apply `effectEvidencePostgresSchemaSql()` and use

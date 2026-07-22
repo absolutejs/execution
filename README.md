@@ -157,6 +157,10 @@ When an authorized envelope carries positive spend, the bridge requires a
 settlement callback and runs it only after provider success, before returning a
 successful effect result. The normalized result retains the mandate, currency,
 and amount needed for a post-compensation refund without retaining credentials.
+Spending envelopes carry that same mandate and currency explicitly, so an
+unknown effect retains its original settlement authority even if installation
+policy changes before provider evidence arrives. The mandate's spend binding is
+the canonical durable effect-input digest.
 Confirmed-success webhook, provider-query, and operator reconciliation paths
 also require settlement before making an unknown effect terminal. Settlement
 and refund callbacks must be idempotent under the effect identity so a crash at

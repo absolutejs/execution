@@ -273,17 +273,21 @@ describe("tenant effect adapter installations", () => {
     ).rejects.toThrow("outside installation scope");
     await expect(
       installations.authorize({
+        currency: "USD",
         destination: "https://api.example.test",
         effect: "message.send",
         installationId: "installation-provider",
+        mandateId: "mandate-a",
         spendMinor: 501,
         tenantId: "tenant-a",
       }),
     ).rejects.toThrow("spend ceiling");
     const authorized = await installations.authorize({
+      currency: "USD",
       destination: "https://api.example.test",
       effect: "message.send",
       installationId: "installation-provider",
+      mandateId: "mandate-a",
       spendBinding: "digest-a",
       spendMinor: 250,
       tenantId: "tenant-a",

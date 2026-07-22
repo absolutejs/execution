@@ -67,9 +67,11 @@ export type EffectAdapterInstallationRegistry = {
 };
 
 export type EffectAdapterInstallationAuthorization = {
+  currency?: string;
   destination?: string;
   effect: string;
   installationId: string;
+  mandateId?: string;
   spendMinor?: number;
   spendBinding?: string;
   tenantId: string;
@@ -465,6 +467,10 @@ export const createEffectAdapterInstallationRegistry = (options: {
         if (!currency || !mandateId)
           throw new EffectAdapterInstallationError(
             "Effect spend requires a configured mandate",
+          );
+        if (input.currency !== currency || input.mandateId !== mandateId)
+          throw new EffectAdapterInstallationError(
+            "Effect spend differs from the installed mandate binding",
           );
         if (
           !(await options.verifyMandate({

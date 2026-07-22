@@ -283,7 +283,12 @@ describe("installed effect adapter execution bridge", () => {
   });
 
   test("settles spending only after provider success with no credential material", async () => {
-    const spendingInput = { ...input, spendMinor: 400 };
+    const spendingInput = {
+      ...input,
+      currency: "USD",
+      mandateId: "mandate-a",
+      spendMinor: 400,
+    };
     const spendingAuthorization = {
       ...authorization,
       installation: {
@@ -326,7 +331,12 @@ describe("installed effect adapter execution bridge", () => {
   });
 
   test("refuses an unhandled spending effect after provider success", async () => {
-    const spendingInput = { ...input, spendMinor: 400 };
+    const spendingInput = {
+      ...input,
+      currency: "USD",
+      mandateId: "mandate-a",
+      spendMinor: 400,
+    };
     let providerCalls = 0;
     const handler = createEffectAdapterExecutionHandler({
       driver: driver(async () => {
@@ -396,7 +406,12 @@ describe("installed effect adapter execution bridge", () => {
         events.push("settlement");
       },
     });
-    const spendingInput = { ...input, spendMinor: 400 };
+    const spendingInput = {
+      ...input,
+      currency: "USD",
+      mandateId: "mandate-a",
+      spendMinor: 400,
+    };
     const spendingContext = context(
       await effectAdapterExecutionInputDigest(spendingInput),
     );

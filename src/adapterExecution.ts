@@ -15,9 +15,11 @@ import type {
 } from "./types";
 
 export type EffectAdapterExecutionEnvelope<Input = unknown> = {
+  currency?: string;
   destination?: string;
   effect: string;
   installationId: string;
+  mandateId?: string;
   payload: Input;
   spendMinor?: number;
 };
@@ -167,7 +169,15 @@ export const parseEffectAdapterExecutionEnvelope = (
     (value.spendMinor !== undefined &&
       (typeof value.spendMinor !== "number" ||
         !Number.isSafeInteger(value.spendMinor) ||
-        value.spendMinor < 0))
+        value.spendMinor < 0)) ||
+    (value.spendMinor !== undefined &&
+      value.spendMinor > 0 &&
+      (typeof value.currency !== "string" ||
+        !value.currency.trim() ||
+        typeof value.mandateId !== "string" ||
+        !value.mandateId.trim())) ||
+    (value.currency !== undefined && typeof value.currency !== "string") ||
+    (value.mandateId !== undefined && typeof value.mandateId !== "string")
   )
     throw new EffectAdapterExecutionError(
       "Installed adapter input envelope is invalid",
@@ -315,7 +325,11 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
         ? {}
         : { spendMinor: input.spendMinor }),
       ...(input.spendMinor !== undefined && input.spendMinor > 0
-        ? { spendBinding: context.inputDigest }
+        ? {
+            currency: input.currency,
+            mandateId: input.mandateId,
+            spendBinding: context.inputDigest,
+          }
         : {}),
       tenantId: context.tenantId,
     });
@@ -381,8 +395,8 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
           throw new EffectAdapterExecutionError(
             "A spending effect requires a settlement handler",
           );
-        const mandateId = authorization.installation.policy.spend.mandateId;
-        const currency = authorization.installation.policy.spend.currency;
+        const mandateId = input.mandateId;
+        const currency = input.currency;
         if (!mandateId || !currency)
           throw new EffectAdapterExecutionError(
             "A spending effect requires an installed mandate and currency",

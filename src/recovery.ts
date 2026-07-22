@@ -86,6 +86,11 @@ export const createEffectRecoveryOperations = (options: {
   }) => Promise<boolean>;
   id?: () => string;
   now?: () => number;
+  settle?: (input: {
+    effect: EffectRecord;
+    evidenceReference: string;
+    source: EffectReconciliationSource;
+  }) => Promise<void>;
   store: EffectRecoveryStore;
   verifyEvidence: (input: {
     effect: EffectRecord;
@@ -155,6 +160,17 @@ export const createEffectRecoveryOperations = (options: {
         throw new EffectRecoveryError(
           "Effect reconciliation evidence is invalid",
         );
+      if (request.resolution === "confirmed_succeeded") {
+        if (!options.settle)
+          throw new EffectRecoveryError(
+            "Confirmed provider success requires a settlement handler",
+          );
+        await options.settle({
+          effect,
+          evidenceReference: request.evidenceReference,
+          source: request.source,
+        });
+      }
 
       const createdAt = now();
       const reconciliation: EffectReconciliationRecord = {

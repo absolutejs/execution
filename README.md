@@ -152,3 +152,12 @@ values exist only in the driver context and are never placed in the durable
 installation record or bridge result. Unknown provider outcomes should be
 raised as `UnknownEffectOutcomeError` so the queue quarantines them for
 reconciliation instead of retrying an ambiguous side effect.
+
+When an authorized envelope carries positive spend, the bridge requires a
+settlement callback and runs it only after provider success, before returning a
+successful effect result. The normalized result retains the mandate, currency,
+and amount needed for a post-compensation refund without retaining credentials.
+Confirmed-success webhook, provider-query, and operator reconciliation paths
+also require settlement before making an unknown effect terminal. Settlement
+and refund callbacks must be idempotent under the effect identity so a crash at
+either boundary can be retried safely.

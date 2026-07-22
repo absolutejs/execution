@@ -282,6 +282,132 @@ describe("installed effect adapter execution bridge", () => {
     ).rejects.toBeInstanceOf(UnknownEffectOutcomeError);
   });
 
+  test("settles spending only after provider success with no credential material", async () => {
+    const spendingInput = { ...input, spendMinor: 400 };
+    const spendingAuthorization = {
+      ...authorization,
+      installation: {
+        ...authorization.installation,
+        policy: {
+          ...authorization.installation.policy,
+          spend: {
+            currency: "USD",
+            mandateId: "mandate-a",
+            maxMinorPerEffect: 500,
+          },
+        },
+      },
+    };
+    const events: string[] = [];
+    const handler = createEffectAdapterExecutionHandler({
+      driver: driver(async () => {
+        events.push("provider");
+        return { providerId: "provider-1" };
+      }),
+      installations: installationRegistry(async () => spendingAuthorization),
+      resolveCredential: async () => "credential-value",
+      settle: async (settlement) => {
+        events.push("settlement");
+        expect(settlement.authorization.spendMinor).toBe(400);
+        expect(settlement.installation.policy.spend.mandateId).toBe(
+          "mandate-a",
+        );
+        expect(JSON.stringify(settlement)).not.toContain("credential-value");
+      },
+    });
+    await handler.execute(
+      spendingInput,
+      context(await effectAdapterExecutionInputDigest(spendingInput)),
+    );
+    expect(events).toEqual(["provider", "settlement"]);
+  });
+
+  test("refuses an unhandled spending effect after provider success", async () => {
+    const spendingInput = { ...input, spendMinor: 400 };
+    let providerCalls = 0;
+    const handler = createEffectAdapterExecutionHandler({
+      driver: driver(async () => {
+        providerCalls += 1;
+        return { providerId: "provider-1" };
+      }),
+      installations: installationRegistry(async () => authorization),
+      resolveCredential: async () => "credential-value",
+    });
+    await expect(
+      handler.execute(
+        spendingInput,
+        context(await effectAdapterExecutionInputDigest(spendingInput)),
+      ),
+    ).rejects.toThrow("requires a settlement handler");
+    expect(providerCalls).toBe(1);
+  });
+
+  test("refunds settlement only after provider compensation succeeds", async () => {
+    const compensatedDescriptor: EffectAdapterDescriptor = {
+      ...descriptor,
+      compensation: { supported: true },
+    };
+    const spendingAuthorization = {
+      ...authorization,
+      adapter: compensatedDescriptor,
+      installation: {
+        ...authorization.installation,
+        policy: {
+          ...authorization.installation.policy,
+          spend: {
+            currency: "USD",
+            mandateId: "mandate-a",
+            maxMinorPerEffect: 500,
+          },
+        },
+      },
+    };
+    const events: string[] = [];
+    const compensatedDriver: EffectAdapterDriver = {
+      ...driver(async () => {
+        events.push("provider");
+        return { providerId: "provider-1" };
+      }),
+      capabilities: {
+        compensation: true,
+        idempotency: true,
+        reconciliation: "manual",
+      },
+      compensate: async () => {
+        events.push("provider-compensation");
+      },
+    };
+    const handler = createEffectAdapterExecutionHandler({
+      driver: compensatedDriver,
+      installations: installationRegistry(async () => spendingAuthorization),
+      refundSettlement: async ({ result }) => {
+        events.push("settlement-refund");
+        expect(result.settlement).toEqual({
+          currency: "USD",
+          mandateId: "mandate-a",
+          spendMinor: 400,
+        });
+      },
+      resolveCredential: async () => "credential-value",
+      settle: async () => {
+        events.push("settlement");
+      },
+    });
+    const spendingInput = { ...input, spendMinor: 400 };
+    const spendingContext = context(
+      await effectAdapterExecutionInputDigest(spendingInput),
+    );
+    const result = await handler.execute(spendingInput, spendingContext);
+    if (!handler.compensate) throw new Error("missing compensation handler");
+    await handler.compensate(result, spendingContext);
+    expect(events).toEqual([
+      "provider",
+      "settlement",
+      "provider-compensation",
+      "settlement-refund",
+    ]);
+  });
+
   test("rejects mutated input before authorization or credential resolution", async () => {
     let authorizations = 0;
     let resolutions = 0;

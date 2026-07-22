@@ -29,6 +29,7 @@ const operations = (
   store: ReturnType<typeof createMemoryEffectStore>,
   options: {
     authorize?: () => Promise<boolean>;
+    settle?: () => Promise<void>;
     verify?: () => Promise<boolean>;
   } = {},
 ) =>
@@ -36,6 +37,7 @@ const operations = (
     authorize: options.authorize ?? (async () => true),
     id: () => "reconciliation-1",
     now: () => 2,
+    settle: options.settle ?? (async () => {}),
     store,
     verifyEvidence: options.verify ?? (async () => true),
   });
@@ -57,6 +59,7 @@ describe("effect recovery operations", () => {
     const recovery = createEffectRecoveryOperations({
       authorize: async () => true,
       now: () => 2,
+      settle: async () => {},
       store,
       verifyEvidence: async () => true,
     });
@@ -124,6 +127,35 @@ describe("effect recovery operations", () => {
     });
     await recovery.resolve(request("effect-3"));
     expect(order).toEqual(["authorize", "evidence"]);
+  });
+
+  test("settles confirmed success before making the effect terminal", async () => {
+    const store = createMemoryEffectStore();
+    await store.enqueue(unknownEffect("effect-settlement"));
+    const recovery = operations(store, {
+      settle: async () => {
+        expect((await store.get("effect-settlement"))?.status).toBe("unknown");
+      },
+    });
+    expect((await recovery.resolve(request("effect-settlement"))).status).toBe(
+      "succeeded",
+    );
+  });
+
+  test("keeps an effect unknown when confirmed-success settlement fails", async () => {
+    const store = createMemoryEffectStore();
+    await store.enqueue(unknownEffect("effect-settlement-failure"));
+    const recovery = operations(store, {
+      settle: async () => {
+        throw new Error("ledger unavailable");
+      },
+    });
+    await expect(
+      recovery.resolve(request("effect-settlement-failure")),
+    ).rejects.toThrow("ledger unavailable");
+    expect((await store.get("effect-settlement-failure"))?.status).toBe(
+      "unknown",
+    );
   });
 
   test("allows exactly one concurrent resolution", async () => {

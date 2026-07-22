@@ -1,6 +1,8 @@
 import type {
   EffectAdapterCredentialInstallation,
+  EffectAdapterInstallationAuthorization,
   EffectAdapterInstallationRegistry,
+  EffectAdapterInstallationRecord,
 } from "./adapterInstallations";
 import {
   effectAdapterQueryReconciliation,
@@ -64,6 +66,29 @@ export type EffectAdapterExecutionResult<Output = unknown> = {
   installationId: string;
   output: Output;
   reconciliationReference?: EffectProviderReconciliationReference;
+  settlement?: EffectAdapterSettlement;
+};
+
+export type EffectAdapterSettlement = {
+  currency: string;
+  mandateId: string;
+  spendMinor: number;
+};
+
+export type EffectAdapterSettlementInput<Output = unknown> = {
+  authorization: EffectAdapterInstallationAuthorization;
+  context: EffectHandlerContext;
+  installation: EffectAdapterInstallationRecord;
+  output: Output;
+  providerReference?: EffectProviderReconciliationReference;
+  settlement: EffectAdapterSettlement;
+};
+
+export type EffectAdapterSettlementRefundInput<Output = unknown> = {
+  context: EffectHandlerContext;
+  result: EffectAdapterExecutionResult<Output> & {
+    settlement: EffectAdapterSettlement;
+  };
 };
 
 export class EffectAdapterExecutionError extends Error {}
@@ -163,6 +188,20 @@ const resultEnvelope = (value: unknown): EffectAdapterExecutionResult => {
     throw new EffectAdapterExecutionError(
       "Installed adapter result envelope is invalid",
     );
+  if (
+    value.settlement !== undefined &&
+    (!record(value.settlement) ||
+      typeof value.settlement.currency !== "string" ||
+      !value.settlement.currency.trim() ||
+      typeof value.settlement.mandateId !== "string" ||
+      !value.settlement.mandateId.trim() ||
+      typeof value.settlement.spendMinor !== "number" ||
+      !Number.isSafeInteger(value.settlement.spendMinor) ||
+      value.settlement.spendMinor < 1)
+  )
+    throw new EffectAdapterExecutionError(
+      "Installed adapter settlement result is invalid",
+    );
 
   return value as EffectAdapterExecutionResult;
 };
@@ -259,6 +298,10 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
     secretAlias: string;
     tenantId: string;
   }) => Promise<string | null | undefined>;
+  refundSettlement?: (
+    input: EffectAdapterSettlementRefundInput<Output>,
+  ) => Promise<void>;
+  settle?: (input: EffectAdapterSettlementInput<Output>) => Promise<void>;
 }): EffectHandler => {
   const prepare = async (
     input: EffectAdapterExecutionEnvelope,
@@ -329,6 +372,36 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
         throw new EffectAdapterExecutionError(
           "Provider reconciliation reference is outside the descriptor contract",
         );
+      let settlement: EffectAdapterSettlement | undefined;
+      if (input.spendMinor !== undefined && input.spendMinor > 0) {
+        if (!options.settle)
+          throw new EffectAdapterExecutionError(
+            "A spending effect requires a settlement handler",
+          );
+        const mandateId = authorization.installation.policy.spend.mandateId;
+        const currency = authorization.installation.policy.spend.currency;
+        if (!mandateId || !currency)
+          throw new EffectAdapterExecutionError(
+            "A spending effect requires an installed mandate and currency",
+          );
+        settlement = { currency, mandateId, spendMinor: input.spendMinor };
+        await options.settle({
+          authorization: {
+            ...(input.destination ? { destination: input.destination } : {}),
+            effect: input.effect,
+            installationId: input.installationId,
+            spendMinor: input.spendMinor,
+            tenantId: context.tenantId,
+          },
+          context,
+          installation: authorization.installation,
+          output,
+          ...(reconciliationReference
+            ? { providerReference: reconciliationReference }
+            : {}),
+          settlement,
+        });
+      }
 
       return {
         adapterId: options.driver.adapterId,
@@ -337,6 +410,7 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
         installationId: input.installationId,
         output,
         ...(reconciliationReference ? { reconciliationReference } : {}),
+        ...(settlement ? { settlement } : {}),
       } satisfies EffectAdapterExecutionResult<Output>;
     },
   };
@@ -359,6 +433,19 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
         result.output,
         (await prepare(input, context)).executionContext,
       );
+      if (result.settlement) {
+        if (!options.refundSettlement)
+          throw new EffectAdapterExecutionError(
+            "Compensated spending requires a settlement refund handler",
+          );
+        await options.refundSettlement({
+          context,
+          result: {
+            ...result,
+            settlement: result.settlement,
+          },
+        });
+      }
     };
 
   return handler;

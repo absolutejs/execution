@@ -22,6 +22,9 @@ export {
   type EffectAdapterDriverContext,
   type EffectAdapterExecutionEnvelope,
   type EffectAdapterExecutionResult,
+  type EffectAdapterSettlementInput,
+  type EffectAdapterSettlement,
+  type EffectAdapterSettlementRefundInput,
   type ResolvedEffectAdapterCredential,
 } from "./adapterExecution";
 export {

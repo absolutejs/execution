@@ -32,6 +32,7 @@ export {
   createMemoryEffectAdapterInstallationStore,
   createPostgresEffectAdapterInstallationStore,
   effectAdapterInstallationsPostgresSchemaSql,
+  effectAdapterPurposeBoundInstallationsPostgresSchemaSql,
   EffectAdapterInstallationError,
   type EffectAdapterCredentialInstallation,
   type EffectAdapterInstallationAuthorization,

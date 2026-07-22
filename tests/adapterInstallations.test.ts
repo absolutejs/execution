@@ -6,6 +6,7 @@ import {
   createMemoryEffectAdapterInstallationStore,
   createMemoryEffectAdapterRegistryStore,
   effectAdapterDescriptorDigest,
+  effectAdapterPurposeBoundInstallationsPostgresSchemaSql,
   EffectAdapterInstallationError,
   type EffectAdapterDescriptor,
 } from "../src";
@@ -137,6 +138,12 @@ const simulationPolicy = {
 } as const;
 
 describe("tenant effect adapter installations", () => {
+  test("ships purpose-bound concurrency as an additive migration", () => {
+    expect(effectAdapterPurposeBoundInstallationsPostgresSchemaSql()).toContain(
+      "DROP CONSTRAINT IF EXISTS adapter_installations_tenant_id_adapter_id_key",
+    );
+  });
+
   test("keeps concurrent purpose-bound installations for one adapter", async () => {
     const adapters = await activeAdapters(providerDescriptor());
     const installations = createEffectAdapterInstallationRegistry({

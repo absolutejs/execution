@@ -314,6 +314,9 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
       ...(input.spendMinor === undefined
         ? {}
         : { spendMinor: input.spendMinor }),
+      ...(input.spendMinor !== undefined && input.spendMinor > 0
+        ? { spendBinding: context.inputDigest }
+        : {}),
       tenantId: context.tenantId,
     });
     assertDriverMatchesDescriptor(options.driver, authorization.adapter);
@@ -390,6 +393,7 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
             ...(input.destination ? { destination: input.destination } : {}),
             effect: input.effect,
             installationId: input.installationId,
+            spendBinding: context.inputDigest,
             spendMinor: input.spendMinor,
             tenantId: context.tenantId,
           },

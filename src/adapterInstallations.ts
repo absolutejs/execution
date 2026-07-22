@@ -71,6 +71,7 @@ export type EffectAdapterInstallationAuthorization = {
   effect: string;
   installationId: string;
   spendMinor?: number;
+  spendBinding?: string;
   tenantId: string;
 };
 
@@ -344,6 +345,7 @@ export const createEffectAdapterInstallationRegistry = (options: {
     destination?: string;
     effect: string;
     mandateId: string;
+    spendBinding?: string;
     tenantId: string;
   }) => boolean | Promise<boolean>;
 }): EffectAdapterInstallationRegistry => {
@@ -450,6 +452,10 @@ export const createEffectAdapterInstallationRegistry = (options: {
         throw new EffectAdapterInstallationError(
           "Effect spend must be a non-negative safe integer",
         );
+      if (input.spendBinding !== undefined && !input.spendBinding.trim())
+        throw new EffectAdapterInstallationError(
+          "Effect spend binding must be non-empty",
+        );
       if (spendMinor > record.policy.spend.maxMinorPerEffect)
         throw new EffectAdapterInstallationError(
           "Effect exceeds the installation spend ceiling",
@@ -468,6 +474,7 @@ export const createEffectAdapterInstallationRegistry = (options: {
             ...(input.destination ? { destination: input.destination } : {}),
             effect: input.effect,
             mandateId,
+            ...(input.spendBinding ? { spendBinding: input.spendBinding } : {}),
             tenantId: record.tenantId,
           }))
         )

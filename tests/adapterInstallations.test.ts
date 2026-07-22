@@ -230,12 +230,14 @@ describe("tenant effect adapter installations", () => {
         destination,
         effect,
         mandateId,
+        spendBinding,
         tenantId,
       }) =>
         tenantId === "tenant-a" &&
         mandateId === "mandate-a" &&
         effect === "message.send" &&
         destination === "https://api.example.test" &&
+        (spendBinding === undefined || spendBinding === "digest-a") &&
         amountMinor <= 500,
     });
     const policy = {
@@ -282,6 +284,7 @@ describe("tenant effect adapter installations", () => {
       destination: "https://api.example.test",
       effect: "message.send",
       installationId: "installation-provider",
+      spendBinding: "digest-a",
       spendMinor: 250,
       tenantId: "tenant-a",
     });

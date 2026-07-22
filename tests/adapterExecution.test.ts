@@ -309,16 +309,19 @@ describe("installed effect adapter execution bridge", () => {
       settle: async (settlement) => {
         events.push("settlement");
         expect(settlement.authorization.spendMinor).toBe(400);
+        expect(settlement.authorization.spendBinding).toBe(
+          spendingContext.inputDigest,
+        );
         expect(settlement.installation.policy.spend.mandateId).toBe(
           "mandate-a",
         );
         expect(JSON.stringify(settlement)).not.toContain("credential-value");
       },
     });
-    await handler.execute(
-      spendingInput,
-      context(await effectAdapterExecutionInputDigest(spendingInput)),
+    const spendingContext = context(
+      await effectAdapterExecutionInputDigest(spendingInput),
     );
+    await handler.execute(spendingInput, spendingContext);
     expect(events).toEqual(["provider", "settlement"]);
   });
 

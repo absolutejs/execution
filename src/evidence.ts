@@ -58,7 +58,6 @@ export const createEffectEvidenceIngestion = (options: {
     evidence: EffectEvidenceRecord,
     source: EffectEvidenceSource,
   ) => Promise<"already_terminal" | "resolved">;
-  settle?: (evidence: EffectEvidenceRecord) => Promise<void>;
   store: EffectEvidenceStore;
 }) => ({
   ingest: async (
@@ -84,14 +83,6 @@ export const createEffectEvidenceIngestion = (options: {
       throw new EffectEvidenceError(
         "Duplicate evidence identity changed binding",
       );
-    if (retained.outcome === "confirmed_succeeded") {
-      if (!options.settle)
-        throw new EffectEvidenceError(
-          "Confirmed provider success requires a settlement handler",
-        );
-      await options.settle(retained);
-    }
-
     return {
       duplicate: !inserted,
       evidence: retained,

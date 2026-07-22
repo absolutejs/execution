@@ -31,7 +31,6 @@ describe("effect evidence ingestion", () => {
         reconciliations += 1;
         return reconciliations === 1 ? "resolved" : "already_terminal";
       },
-      settle: async () => {},
       store,
     });
     expect((await ingestion.ingest(evidence())).duplicate).toBe(false);
@@ -45,7 +44,6 @@ describe("effect evidence ingestion", () => {
     const ingestion = createEffectEvidenceIngestion({
       authorize: async () => true,
       reconcile: async () => "resolved",
-      settle: async () => {},
       store,
     });
     await ingestion.ingest(evidence());
@@ -59,50 +57,12 @@ describe("effect evidence ingestion", () => {
     const ingestion = createEffectEvidenceIngestion({
       authorize: async () => false,
       reconcile: async () => "resolved",
-      settle: async () => {},
       store,
     });
     await expect(ingestion.ingest(evidence())).rejects.toBeInstanceOf(
       EffectEvidenceError,
     );
     expect(await store.list({ limit: 10 })).toHaveLength(0);
-  });
-
-  test("settles confirmed success before reconciliation and retries settlement for duplicate delivery", async () => {
-    const events: string[] = [];
-    const ingestion = createEffectEvidenceIngestion({
-      authorize: async () => true,
-      reconcile: async () => {
-        events.push("reconcile");
-        return "resolved";
-      },
-      settle: async () => {
-        events.push("settle");
-      },
-      store: createMemoryEffectEvidenceStore(),
-    });
-    await ingestion.ingest(evidence());
-    await ingestion.ingest(evidence());
-    expect(events).toEqual(["settle", "reconcile", "settle", "reconcile"]);
-  });
-
-  test("does not reconcile confirmed success when settlement fails", async () => {
-    let reconciliations = 0;
-    const ingestion = createEffectEvidenceIngestion({
-      authorize: async () => true,
-      reconcile: async () => {
-        reconciliations += 1;
-        return "resolved";
-      },
-      settle: async () => {
-        throw new Error("ledger unavailable");
-      },
-      store: createMemoryEffectEvidenceStore(),
-    });
-    await expect(ingestion.ingest(evidence())).rejects.toThrow(
-      "ledger unavailable",
-    );
-    expect(reconciliations).toBe(0);
   });
 
   test("ships a normalized evidence schema without raw payload storage", () => {

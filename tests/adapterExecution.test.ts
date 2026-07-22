@@ -305,8 +305,11 @@ describe("installed effect adapter execution bridge", () => {
     };
     const events: string[] = [];
     const handler = createEffectAdapterExecutionHandler({
-      driver: driver(async () => {
+      driver: driver(async (_value, driverContext) => {
         events.push("provider");
+        expect(driverContext.currency).toBe("USD");
+        expect(driverContext.mandateId).toBe("mandate-a");
+        expect(driverContext.spendMinor).toBe(400);
         return { providerId: "provider-1" };
       }),
       installations: installationRegistry(async () => spendingAuthorization),
@@ -386,8 +389,11 @@ describe("installed effect adapter execution bridge", () => {
         idempotency: true,
         reconciliation: "manual",
       },
-      compensate: async () => {
+      compensate: async (_output, compensationContext) => {
         events.push("provider-compensation");
+        expect(compensationContext.currency).toBe("USD");
+        expect(compensationContext.mandateId).toBe("mandate-a");
+        expect(compensationContext.spendMinor).toBe(400);
       },
     };
     const handler = createEffectAdapterExecutionHandler({

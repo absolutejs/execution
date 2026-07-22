@@ -38,9 +38,12 @@ export type ResolvedEffectAdapterCredential =
 
 export type EffectAdapterDriverContext = EffectHandlerContext & {
   credentials: ReadonlyArray<ResolvedEffectAdapterCredential>;
+  currency?: string;
   destination?: string;
   effect: string;
   installationId: string;
+  mandateId?: string;
+  spendMinor?: number;
 };
 
 export type EffectAdapterDriver<Input = unknown, Output = unknown> = {
@@ -294,9 +297,12 @@ const driverContext = (
 ): EffectAdapterDriverContext => ({
   ...context,
   credentials,
+  ...(input.currency ? { currency: input.currency } : {}),
   ...(input.destination ? { destination: input.destination } : {}),
   effect: input.effect,
   installationId: input.installationId,
+  ...(input.mandateId ? { mandateId: input.mandateId } : {}),
+  ...(input.spendMinor === undefined ? {} : { spendMinor: input.spendMinor }),
 });
 
 export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
@@ -442,6 +448,13 @@ export const createEffectAdapterExecutionHandler = <Input, Output>(options: {
           "Compensation result belongs to another adapter",
         );
       const input: EffectAdapterExecutionEnvelope = {
+        ...(result.settlement
+          ? {
+              currency: result.settlement.currency,
+              mandateId: result.settlement.mandateId,
+              spendMinor: result.settlement.spendMinor,
+            }
+          : {}),
         ...(result.destination ? { destination: result.destination } : {}),
         effect: result.effect,
         installationId: result.installationId,

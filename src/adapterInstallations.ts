@@ -258,8 +258,9 @@ export const effectAdapterInstallationsPostgresSchemaSql = (
   enabled boolean NOT NULL DEFAULT false,
   installed_at bigint NOT NULL,
   updated_at bigint NOT NULL,
-  UNIQUE (tenant_id, adapter_id)
+  UNIQUE (tenant_id, installation_id)
 );
+ALTER TABLE ${namespace}.adapter_installations DROP CONSTRAINT IF EXISTS adapter_installations_tenant_id_adapter_id_key;
 CREATE INDEX IF NOT EXISTS adapter_installations_tenant_idx ON ${namespace}.adapter_installations (tenant_id, installation_id);
 CREATE INDEX IF NOT EXISTS adapter_installations_enabled_idx ON ${namespace}.adapter_installations (enabled, adapter_id);`;
 };

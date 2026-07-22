@@ -137,6 +137,46 @@ const simulationPolicy = {
 } as const;
 
 describe("tenant effect adapter installations", () => {
+  test("keeps concurrent purpose-bound installations for one adapter", async () => {
+    const adapters = await activeAdapters(providerDescriptor());
+    const installations = createEffectAdapterInstallationRegistry({
+      adapters,
+      now: () => NOW,
+      store: createMemoryEffectAdapterInstallationStore(),
+      verifyCredentialAlias: async () => true,
+      verifyMandate: async () => true,
+    });
+    const policy = (mandateId: string) => ({
+      credentials: [
+        {
+          adapterAlias: "API_TOKEN",
+          destination: "https://api.example.test",
+          secretAlias: "PROJECT_PROVIDER_TOKEN",
+        },
+      ],
+      destinations: ["https://api.example.test"],
+      effects: ["message.send"],
+      spend: { currency: "USD", mandateId, maxMinorPerEffect: 500 },
+    });
+
+    await installations.put({
+      adapterId: "provider",
+      installationId: "purchase-a",
+      policy: policy("mandate-a"),
+      tenantId: "tenant-a",
+    });
+    await installations.put({
+      adapterId: "provider",
+      installationId: "purchase-b",
+      policy: policy("mandate-b"),
+      tenantId: "tenant-a",
+    });
+
+    expect(
+      await installations.inventory({ tenantId: "tenant-a" }),
+    ).toHaveLength(2);
+  });
+
   test("starts disabled and keeps authorization tenant-fenced", async () => {
     const adapters = await activeAdapters(simulationDescriptor());
     const installations = createEffectAdapterInstallationRegistry({

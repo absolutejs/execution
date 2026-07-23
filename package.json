@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/execution",
-  "version": "0.14.2",
+  "version": "0.14.3",
   "description": "Crash-safe external effect execution for AI agents with a transactional outbox, queue integration, reconciliation, and compensation.",
   "type": "module",
   "license": "MIT",
@@ -36,12 +36,13 @@
     "format": "prettier --write \"./**/*.{ts,json,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external '@absolutejs/*' --external @sinclair/typebox && tsc -p tsconfig.build.json && absolute-manifest emit",
+    "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external '@absolutejs/*' --external @sinclair/typebox --external drizzle-orm --external 'drizzle-orm/*' && tsc -p tsconfig.build.json && absolute-manifest emit",
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
     "@absolutejs/manifest": "^0.2.0",
-    "@sinclair/typebox": "^0.34.0"
+    "@sinclair/typebox": "^0.34.0",
+    "drizzle-orm": "1.0.0-rc.4"
   },
   "devDependencies": {
     "@absolutejs/agent-conformance": "^0.13.0",

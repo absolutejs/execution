@@ -1,4 +1,14 @@
 export { createMemoryEffectStore } from "./memory";
+export { createDrizzleEffectStore } from "./drizzleEffect";
+export {
+  createDrizzleEffectAdapterHealthStore,
+  createDrizzleEffectAdapterInstallationStore,
+  createDrizzleEffectAdapterRegistryStore,
+  createDrizzleEffectEvidenceStore,
+  createDrizzleEffectReconciliationLeaseStore,
+  createDrizzleEffectReconciliationSchedulerStore,
+  executionDrizzleSchema,
+} from "./drizzle";
 export {
   createEffectEvidenceIngestion,
   createMemoryEffectEvidenceStore,

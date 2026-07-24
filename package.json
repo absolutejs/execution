@@ -1,6 +1,6 @@
 {
   "name": "@absolutejs/execution",
-  "version": "0.14.4",
+  "version": "0.14.5",
   "description": "Crash-safe external effect execution for AI agents with a transactional outbox, queue integration, reconciliation, and compensation.",
   "type": "module",
   "license": "MIT",
@@ -14,7 +14,30 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "absolutejs": {
-    "manifestContract": 2
+    "manifestContract": 2,
+    "runtimePeers": {
+      "@absolutejs/agent-runtime": {
+        "artifactImports": [
+          "@absolutejs/agent-runtime"
+        ],
+        "buildExternals": [
+          "@absolutejs/agent-runtime"
+        ],
+        "range": ">=0.2.1 <0.3.0",
+        "tested": "0.2.4"
+      },
+      "drizzle-orm": {
+        "artifactImports": [
+          "drizzle-orm",
+          "drizzle-orm/pg-core"
+        ],
+        "buildExternals": [
+          "drizzle-orm"
+        ],
+        "range": ">=1.0.0-rc.4 <2",
+        "tested": "1.0.0-rc.4"
+      }
+    }
   },
   "exports": {
     ".": {
@@ -36,16 +59,16 @@
     "format": "prettier --write \"./**/*.{ts,json,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external '@absolutejs/*' --external @sinclair/typebox --external drizzle-orm --external 'drizzle-orm/*' && tsc -p tsconfig.build.json && absolute-manifest emit",
+    "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external @absolutejs/agent-runtime --external @absolutejs/manifest --external @sinclair/typebox --external drizzle-orm --external 'drizzle-orm/*' && tsc -p tsconfig.build.json && absolute-manifest emit",
     "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.2.0",
+    "@absolutejs/manifest": "^0.7.1",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
     "@absolutejs/agent-conformance": "^0.13.0",
-    "@absolutejs/agent-runtime": "^0.2.1",
+    "@absolutejs/agent-runtime": "0.2.4",
     "@absolutejs/queue": "^0.4.1",
     "@types/bun": "^1.3.14",
     "prettier": "3.5.3",

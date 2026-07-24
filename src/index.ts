@@ -114,6 +114,10 @@ export {
   type ExecutionSqlResult,
 } from "./postgres";
 export {
+  executionPostgresMigrations,
+  type ExecutionPostgresMigration,
+} from "./migrations";
+export {
   createEffectRecoveryOperations,
   EffectRecoveryError,
   type EffectRecoveryCase,

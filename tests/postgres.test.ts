@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { SQL } from "bun";
 import {
   createPostgresEffectStore,
   effectRecoveryPostgresSchemaSql,
@@ -158,4 +159,113 @@ describe("PostgreSQL effect store", () => {
     expect(queries.join("\n")).toContain("$2::text");
     expect(queries.join("\n")).toContain("$3::bigint");
   });
+
+  test("parses serialized JSON parameters as text before converting to jsonb", async () => {
+    const queries: string[] = [];
+    const store = createPostgresEffectStore({
+      client: {
+        query: async <Row>(text: string) => {
+          queries.push(text);
+          return { rows: [{ effect_id: "effect-1" } as Row] };
+        },
+      },
+    });
+    const effect: EffectRecord = {
+      actionId: "action-1",
+      attempts: 0,
+      availableAt: 0,
+      createdAt: 0,
+      effectId: "effect-1",
+      handler: "send",
+      idempotencyKey: "key-1",
+      input: { canary: "json-object" },
+      inputDigest: "digest",
+      status: "pending",
+      tenantId: "tenant-1",
+      updatedAt: 0,
+    };
+
+    await store.enqueue(effect);
+    await store.claimEffect("effect-1", "worker-1", 30_000, 1);
+    await store.succeed("effect-1", "worker-1", { ok: true }, 2);
+
+    expect(queries.join("\n")).not.toMatch(/\$\d+::jsonb/u);
+    expect(queries.join("\n")).toContain("$9::text::jsonb");
+    expect(queries.join("\n")).toContain("$4::text::jsonb");
+  });
+
+  const databaseUrl = process.env.EXECUTION_TEST_DATABASE_URL;
+  const databaseTest = databaseUrl === undefined ? test.skip : test;
+
+  databaseTest(
+    "preserves effect records through Bun SQL jsonb bindings",
+    async () => {
+      const namespace = `execution_jsonb_${crypto
+        .randomUUID()
+        .replaceAll("-", "_")}`;
+      const sql = new SQL({
+        max: 1,
+        prepare: false,
+        url: databaseUrl!,
+      });
+      const client: ExecutionSqlClient = {
+        query: async <Row>(text: string, values: readonly unknown[] = []) => ({
+          rows: Array.from((await sql.unsafe(text, [...values])) as Row[]),
+        }),
+      };
+      const store = createPostgresEffectStore({ client, namespace });
+      const effect: EffectRecord = {
+        actionId: "action-bun",
+        attempts: 0,
+        availableAt: 1,
+        createdAt: 1,
+        effectId: "effect-bun",
+        handler: "send",
+        idempotencyKey: "key-bun",
+        input: { canary: "json-object" },
+        inputDigest: "digest-bun",
+        status: "pending",
+        tenantId: "tenant-bun",
+        updatedAt: 1,
+      };
+
+      try {
+        await sql.unsafe(executionPostgresSchemaSql(namespace));
+        await sql.unsafe(executionTenantInventoryPostgresSchemaSql(namespace));
+        expect(await store.enqueue(effect)).toBe(true);
+
+        const claimed = await store.claimEffect(
+          effect.effectId,
+          "worker-bun",
+          30_000,
+          2,
+        );
+        expect(claimed).toMatchObject({
+          actionId: effect.actionId,
+          effectId: effect.effectId,
+          input: effect.input,
+          status: "leased",
+        });
+
+        expect(
+          await store.succeed(
+            effect.effectId,
+            "worker-bun",
+            { canary: "result-object" },
+            3,
+          ),
+        ).toBe(true);
+        expect(await store.get(effect.effectId)).toMatchObject({
+          actionId: effect.actionId,
+          effectId: effect.effectId,
+          input: effect.input,
+          result: { canary: "result-object" },
+          status: "succeeded",
+        });
+      } finally {
+        await sql.unsafe(`DROP SCHEMA IF EXISTS ${namespace} CASCADE`);
+        await sql.close({ timeout: 5 });
+      }
+    },
+  );
 });

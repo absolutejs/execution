@@ -126,7 +126,7 @@ export const createPostgresEffectStore = ({
       updatedAt: now,
     };
     const result = await client.query<{ effect_id: string }>(
-      `UPDATE ${ns}.effects SET status = $3, data = (data - 'leaseOwner' - 'leaseExpiresAt') || $4::jsonb, lease_owner = NULL, lease_expires_at = NULL, updated_at = $5, available_at = COALESCE($6, available_at) WHERE effect_id = $1 AND lease_owner = $2 AND status = 'leased' RETURNING effect_id`,
+      `UPDATE ${ns}.effects SET status = $3, data = (data - 'leaseOwner' - 'leaseExpiresAt') || $4::text::jsonb, lease_owner = NULL, lease_expires_at = NULL, updated_at = $5, available_at = COALESCE($6, available_at) WHERE effect_id = $1 AND lease_owner = $2 AND status = 'leased' RETURNING effect_id`,
       [
         effectId,
         workerId,
@@ -144,7 +144,7 @@ export const createPostgresEffectStore = ({
       const result = await client.query<{ effect_id: string }>(
         `WITH inserted AS (
           INSERT INTO ${ns}.effects (effect_id, action_id, handler, idempotency_key, status, attempts, available_at, input_digest, data, created_at, updated_at, tenant_id, run_id)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12, $13)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::text::jsonb, $10, $11, $12, $13)
           ON CONFLICT DO NOTHING RETURNING effect_id, created_at
         ), queued AS (
           INSERT INTO ${ns}.effect_outbox (event_id, effect_id, created_at)
@@ -229,7 +229,7 @@ export const createPostgresEffectStore = ({
     },
     finishCompensation: async (effectId, workerId, now, error) => {
       const result = await client.query<{ effect_id: string }>(
-        `UPDATE ${ns}.effects SET status = $3, lease_owner = NULL, updated_at = $4, data = (data - 'leaseOwner') || $5::jsonb WHERE effect_id = $1 AND lease_owner = $2 AND status = 'compensating' RETURNING effect_id`,
+        `UPDATE ${ns}.effects SET status = $3, lease_owner = NULL, updated_at = $4, data = (data - 'leaseOwner') || $5::text::jsonb WHERE effect_id = $1 AND lease_owner = $2 AND status = 'compensating' RETURNING effect_id`,
         [
           effectId,
           workerId,
@@ -356,7 +356,7 @@ export const createPostgresEffectStore = ({
       };
       const result = await client.query<{ effect_id: string }>(
         `UPDATE ${ns}.effects
-         SET status = 'unknown', data = (data - 'leaseOwner' - 'leaseExpiresAt') || $3::jsonb,
+         SET status = 'unknown', data = (data - 'leaseOwner' - 'leaseExpiresAt') || $3::text::jsonb,
              lease_owner = NULL, lease_expires_at = NULL, updated_at = $4
          WHERE effect_id = $1 AND attempts = $2 AND status = 'leased'
          RETURNING effect_id`,
@@ -366,7 +366,7 @@ export const createPostgresEffectStore = ({
     },
     reconcile: async (effectId, update, now) => {
       const result = await client.query<{ effect_id: string }>(
-        `UPDATE ${ns}.effects SET status = $2, data = data || $3::jsonb, updated_at = $4 WHERE effect_id = $1 AND status = 'unknown' RETURNING effect_id`,
+        `UPDATE ${ns}.effects SET status = $2, data = data || $3::text::jsonb, updated_at = $4 WHERE effect_id = $1 AND status = 'unknown' RETURNING effect_id`,
         [
           effectId,
           update.status,
@@ -387,7 +387,7 @@ export const createPostgresEffectStore = ({
         `WITH updated AS (
           UPDATE ${ns}.effects
           SET status = $2,
-              data = (data - 'error' - 'result') || $3::jsonb,
+              data = (data - 'error' - 'result') || $3::text::jsonb,
               updated_at = $4
           WHERE effect_id = $1 AND tenant_id = $5 AND status = 'unknown'
           RETURNING effect_id

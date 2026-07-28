@@ -309,7 +309,7 @@ export const createPostgresEffectAdapterInstallationStore = (options: {
       const result = await options.client.query(
         `INSERT INTO ${namespace}.adapter_installations
           (installation_id, tenant_id, adapter_id, adapter_version, descriptor_digest, policy, enabled, installed_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
+         VALUES ($1, $2, $3, $4, $5, $6::text::jsonb, $7, $8, $9)
          ON CONFLICT (installation_id) DO UPDATE SET
           adapter_id = excluded.adapter_id,
           adapter_version = excluded.adapter_version,

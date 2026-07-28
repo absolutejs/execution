@@ -49,6 +49,12 @@ const registry = createJobRegistry(executionJobs).on(
 const worker = createQueueWorker({ registry, store: queueStore });
 ```
 
+`ExecutionSqlClient` accepts serialized JSON values as ordinary query
+parameters. Execution explicitly parses those values through PostgreSQL
+`text` before converting them to `jsonb`, so adapters for Bun SQL,
+postgres.js, and Neon must pass the provided values through unchanged rather
+than JSON-encoding them again.
+
 If a provider times out after accepting a request, throw
 `UnknownEffectOutcomeError`. Execution will not retry blindly: it quarantines
 the effect as `unknown` until an authorized operator, provider query, or

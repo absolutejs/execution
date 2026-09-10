@@ -11,7 +11,7 @@
       "devDependencies": {
         "@absolutejs/agent-conformance": "^0.13.0",
         "@absolutejs/agent-runtime": "0.2.4",
-        "@absolutejs/changelog": "^0.1.2",
+        "@absolutejs/changelog": "^0.2.0",
         "@absolutejs/queue": "^0.8.0",
         "@types/bun": "^1.3.14",
         "drizzle-orm": "1.0.0-rc.4",
@@ -29,7 +29,7 @@
 
     "@absolutejs/agent-runtime": ["@absolutejs/agent-runtime@0.2.4", "", { "dependencies": { "@absolutejs/manifest": "^0.7.1", "@sinclair/typebox": "^0.34.0" }, "peerDependencies": { "drizzle-orm": ">=1.0.0-rc.4 <2" } }, "sha512-ujyE+W2DzPMejL014lxG6NF+TLWgx791ELImoJDyMzB8Nrs3xnLmHx32ACUMiEiNvoBCHNy2Fi/juFK2QUnvQw=="],
 
-    "@absolutejs/changelog": ["@absolutejs/changelog@0.1.2", "", { "bin": { "absolute-changelog": "dist/cli.js" } }, "sha512-q6gQwkDr0IVdWHzTOT3AaZvPSn0ucNidbjBnAUZ8CSwS3wrCd02YMXuBC8sd0ptpYvCowLnR/QWIpBrNqbn+YA=="],
+    "@absolutejs/changelog": ["@absolutejs/changelog@0.2.0", "", { "bin": { "absolute-changelog": "dist/cli.js" } }, "sha512-9GdRyWB3X5zEwlTcVCH+qUS84FTChCoZvli0z3Gp8SI3pnLN4XK3vO0s45dPk5ZfezxAzC1ZwlKWTh44eLxh1w=="],
 
     "@absolutejs/handoff": ["@absolutejs/handoff@0.1.0", "", { "dependencies": { "@absolutejs/manifest": "0.7.2", "@sinclair/typebox": "0.34.52" } }, "sha512-P9Wr2oyYBcj7mriCV4h9zRlLGijee/7DW8USVkl/m4ovql7zpITy547jy6j8+HC5v5Ocs+TVcMYmrROEEBupNg=="],
 

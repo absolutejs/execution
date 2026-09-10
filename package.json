@@ -14,30 +14,7 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "absolutejs": {
-    "manifestContract": 2,
-    "runtimePeers": {
-      "@absolutejs/agent-runtime": {
-        "artifactImports": [
-          "@absolutejs/agent-runtime"
-        ],
-        "buildExternals": [
-          "@absolutejs/agent-runtime"
-        ],
-        "range": ">=0.2.1 <0.3.0",
-        "tested": "0.2.4"
-      },
-      "drizzle-orm": {
-        "artifactImports": [
-          "drizzle-orm",
-          "drizzle-orm/pg-core"
-        ],
-        "buildExternals": [
-          "drizzle-orm"
-        ],
-        "range": ">=1.0.0-rc.4 <2",
-        "tested": "1.0.0-rc.4"
-      }
-    }
+    "manifestContract": 2
   },
   "exports": {
     ".": {
@@ -51,29 +28,32 @@
     "./manifest.json": "./dist/manifest.json"
   },
   "files": [
-    "dist",
+    "CHANGELOG.md",
+    "LICENSE",
     "README.md",
-    "LICENSE"
+    "changelog.json",
+    "dist"
   ],
   "scripts": {
     "format": "prettier --write \"./**/*.{ts,json,md}\"",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
     "build": "rm -rf dist && bun build src/index.ts src/manifest.ts --outdir dist --target=bun --external @absolutejs/agent-runtime --external @absolutejs/manifest --external @sinclair/typebox --external drizzle-orm --external 'drizzle-orm/*' && tsc -p tsconfig.build.json && absolute-manifest emit",
-    "check:package": "bun run format && bun run typecheck && bun run test && bun run build"
+    "check:package": "bun run format && bun run typecheck && bun run test && bun run build && absolute-changelog check"
   },
   "dependencies": {
-    "@absolutejs/manifest": "^0.7.1",
+    "@absolutejs/manifest": "^0.9.0",
     "@sinclair/typebox": "^0.34.0"
   },
   "devDependencies": {
     "@absolutejs/agent-conformance": "^0.13.0",
     "@absolutejs/agent-runtime": "0.2.4",
-    "@absolutejs/queue": "^0.4.1",
+    "@absolutejs/changelog": "^0.1.2",
+    "@absolutejs/queue": "^0.8.0",
     "@types/bun": "^1.3.14",
+    "drizzle-orm": "1.0.0-rc.4",
     "prettier": "3.5.3",
-    "typescript": "5.8.3",
-    "drizzle-orm": "1.0.0-rc.4"
+    "typescript": "5.8.3"
   },
   "peerDependencies": {
     "@absolutejs/agent-runtime": ">=0.2.1 <0.3.0",

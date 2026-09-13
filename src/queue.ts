@@ -51,16 +51,28 @@ export const createExecutionOutboxDispatcher = ({
 export const createExecutionQueueHandler =
   ({
     handlers,
+    leaseMs = 30_000,
+    heartbeatMs = Math.floor(leaseMs / 3),
     now = Date.now,
     store,
     workerId = crypto.randomUUID(),
   }: {
     handlers: Record<string, EffectHandler>;
+    leaseMs?: number;
+    heartbeatMs?: number;
     now?: () => number;
     store: EffectStore;
     workerId?: string;
   }): ExecutionQueueHandler =>
   async ({ effectId }, context) => {
+    if (
+      !Number.isSafeInteger(leaseMs) ||
+      !Number.isSafeInteger(heartbeatMs) ||
+      heartbeatMs < 1 ||
+      heartbeatMs >= leaseMs
+    )
+      throw new Error("Invalid execution lease renewal interval");
+    context.signal.throwIfAborted();
     const current = await store.get(effectId);
     if (
       !current ||
@@ -72,7 +84,13 @@ export const createExecutionQueueHandler =
     if (current.status === "unknown" || current.status === "dead_letter") {
       return;
     }
-    const effect = await store.claimEffect(effectId, workerId, 30_000, now());
+    const leaseOwner = `${workerId}:${crypto.randomUUID()}`;
+    const effect = await store.claimEffect(
+      effectId,
+      leaseOwner,
+      leaseMs,
+      now(),
+    );
     if (!effect) {
       throw new Error(`Effect ${effectId} is not claimable`);
     }
@@ -84,7 +102,7 @@ export const createExecutionQueueHandler =
       number: effect.attempts,
       outcome: "running",
       startedAt: now(),
-      workerId,
+      workerId: leaseOwner,
     });
     const handler = handlers[effect.handler];
     if (!handler) {
@@ -92,12 +110,37 @@ export const createExecutionQueueHandler =
       await store.finishAttempt(attemptId, "failed", now(), message);
       await store.fail(
         effectId,
-        workerId,
+        leaseOwner,
         { error: message, status: "dead_letter" },
         now(),
       );
       return;
     }
+    const leaseAbort = new AbortController();
+    const signal = AbortSignal.any([context.signal, leaseAbort.signal]);
+    let renewal: Promise<void> | undefined;
+    const renew = async () => {
+      try {
+        if (!(await store.heartbeat(effectId, leaseOwner, leaseMs, now())))
+          throw new Error("Execution lease lost");
+      } catch {
+        leaseAbort.abort(
+          new UnknownEffectOutcomeError(
+            "Execution lease renewal failed; outcome requires reconciliation",
+          ),
+        );
+      }
+    };
+    const timer = setInterval(() => {
+      if (!renewal && !leaseAbort.signal.aborted)
+        renewal = renew().finally(() => {
+          renewal = undefined;
+        });
+    }, heartbeatMs);
+    const stopRenewal = async () => {
+      clearInterval(timer);
+      await renewal;
+    };
     let result: unknown;
     try {
       result = await handler.execute(effect.input, {
@@ -106,20 +149,34 @@ export const createExecutionQueueHandler =
         idempotencyKey: effect.idempotencyKey,
         inputDigest: effect.inputDigest,
         ...(effect.runId ? { runId: effect.runId } : {}),
-        signal: context.signal,
+        signal,
         tenantId: effect.tenantId,
       });
+      await stopRenewal();
+      if (signal.aborted)
+        throw new UnknownEffectOutcomeError(
+          "Execution interrupted before completion was committed",
+        );
       await store.finishAttempt(attemptId, "succeeded", now());
-      if (!(await store.succeed(effectId, workerId, result, now()))) {
+      if (!(await store.succeed(effectId, leaseOwner, result, now()))) {
         throw new UnknownEffectOutcomeError(
           "Provider succeeded but the local completion lease was lost",
         );
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (error instanceof UnknownEffectOutcomeError) {
+      await stopRenewal();
+      const outcomeError = signal.aborted
+        ? new UnknownEffectOutcomeError(
+            "Execution interrupted; outcome requires reconciliation",
+          )
+        : error;
+      const message =
+        outcomeError instanceof Error
+          ? outcomeError.message
+          : String(outcomeError);
+      if (outcomeError instanceof UnknownEffectOutcomeError) {
         const reconciliationReference =
-          error.reconciliationReference ??
+          outcomeError.reconciliationReference ??
           effectProviderReconciliationReferenceFromResult(result);
         await store.finishAttempt(attemptId, "unknown", now(), message);
         await store.quarantineUnknown(
@@ -137,7 +194,7 @@ export const createExecutionQueueHandler =
       await store.finishAttempt(attemptId, "failed", now(), message);
       await store.fail(
         effectId,
-        workerId,
+        leaseOwner,
         {
           error: message,
           status: dead ? "dead_letter" : "failed",
@@ -145,6 +202,8 @@ export const createExecutionQueueHandler =
         now(),
       );
       if (!dead) throw error;
+    } finally {
+      await stopRenewal();
     }
   };
 

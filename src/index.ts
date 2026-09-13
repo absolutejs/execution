@@ -154,3 +154,10 @@ export type {
   ExecutionQueueHandler,
   ExecutionQueueStore,
 } from "./types";
+
+export {
+  runCheckpointedSteps,
+  type StepCheckpoint,
+  type VersionedStepCheckpoint,
+  type CheckpointedStepsOptions,
+} from "./checkpointedSteps";

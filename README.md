@@ -171,3 +171,19 @@ Confirmed-success webhook, provider-query, and operator reconciliation paths
 also require settlement before making an unknown effect terminal. Settlement
 and refund callbacks must be idempotent under the effect identity so a crash at
 either boundary can be retried safely.
+
+## Bounded background steps
+
+`runCheckpointedSteps` runs an immutable finite plan under a caller-owned, renewed
+execution lease. Its adapter must atomically save the full checkpoint using the
+expected revision. Save a unique plan key that covers every execution input.
+Completed steps are reused. An in-flight marker on recovery throws
+`UnknownEffectOutcomeError`: do not retry that provider operation blindly.
+Return from `runStep` only after known usage writes drain. A false `beforeStep`
+result durably stops the plan (for example, at the agreed credit ceiling).
+
+`createExecutionQueueHandler` renews its effect lease (30 seconds by default,
+renewed every 10 seconds), forwards shutdown/lease loss through the handler's
+signal, and quarantines uncertain completion. Each invocation has a unique lease
+owner. The queue job lease must also exceed the bounded job duration or be renewed
+by the queue worker. This API does not make arbitrary providers idempotent.

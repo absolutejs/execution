@@ -303,3 +303,91 @@ test("bridges a runtime wait to one tenant-fenced durable effect", async () => {
   clock = 1_001;
   expect((await runtime.workOne("runtime-2"))?.status).toBe("completed");
 });
+
+test("queue handler renews a long-running effect and stops renewing after completion", async () => {
+  const base = createMemoryEffectStore();
+  await base.enqueue(effect("long"));
+  let renewals = 0;
+  const store = {
+    ...base,
+    heartbeat: async (...args: Parameters<typeof base.heartbeat>) => {
+      renewals++;
+      return base.heartbeat(...args);
+    },
+  };
+  const handler = createExecutionQueueHandler({
+    store,
+    leaseMs: 60,
+    heartbeatMs: 10,
+    handlers: {
+      send: {
+        execute: async () => {
+          await Bun.sleep(140);
+          return "done";
+        },
+      },
+    },
+  });
+  await handler(
+    { effectId: "long" },
+    {
+      attempts: 0,
+      id: "job",
+      kind: "absolutejs.execution.effect",
+      maxAttempts: 3,
+      signal: new AbortController().signal,
+    },
+  );
+  expect(renewals).toBeGreaterThan(2);
+  expect((await base.get("long"))?.status).toBe("succeeded");
+  const final = renewals;
+  await Bun.sleep(30);
+  expect(renewals).toBe(final);
+});
+
+for (const mode of ["lost", "error", "abort"] as const) {
+  test(`queue handler quarantines ${mode} during provider execution`, async () => {
+    const base = createMemoryEffectStore();
+    await base.enqueue(effect(mode));
+    const abort = new AbortController();
+    let calls = 0;
+    const store = {
+      ...base,
+      heartbeat: async () => {
+        if (mode === "error") throw new Error("database unavailable");
+        if (mode === "abort") abort.abort();
+        return false;
+      },
+    };
+    const handler = createExecutionQueueHandler({
+      store,
+      leaseMs: 60,
+      heartbeatMs: 5,
+      handlers: {
+        send: {
+          execute: async (_, { signal }) => {
+            calls++;
+            await new Promise<void>((resolve) =>
+              signal.addEventListener("abort", () => resolve(), { once: true }),
+            );
+            return "provider might have succeeded";
+          },
+        },
+      },
+    });
+    const context = {
+      attempts: 0,
+      id: "job",
+      kind: "absolutejs.execution.effect" as const,
+      maxAttempts: 3,
+      signal: abort.signal,
+    };
+    await handler({ effectId: mode }, context);
+    expect((await base.get(mode))?.status).toBe("unknown");
+    await handler(
+      { effectId: mode },
+      { ...context, signal: new AbortController().signal },
+    );
+    expect(calls).toBe(1);
+  });
+}

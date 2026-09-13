@@ -1,5 +1,20 @@
 {
 	"contract": 1,
 	"name": "@absolutejs/execution",
-	"releases": []
+	"releases": [
+		{
+			"changes": [
+				{
+					"kind": "changed",
+					"summary": "Persist bounded step progress and renew queued effect leases; quarantine interrupted provider outcomes.",
+					"symbols": [
+						"createExecutionQueueHandler",
+						"runCheckpointedSteps"
+					]
+				}
+			],
+			"date": "2026-09-13",
+			"version": "0.14.8"
+		}
+	]
 }

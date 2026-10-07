@@ -142,6 +142,7 @@ export const createExecutionQueueHandler =
       await renewal;
     };
     let result: unknown;
+    let providerReturned = false;
     try {
       result = await handler.execute(effect.input, {
         actionId: effect.actionId,
@@ -152,24 +153,29 @@ export const createExecutionQueueHandler =
         signal,
         tenantId: effect.tenantId,
       });
+      providerReturned = true;
       await stopRenewal();
       if (signal.aborted)
         throw new UnknownEffectOutcomeError(
           "Execution interrupted before completion was committed",
         );
-      await store.finishAttempt(attemptId, "succeeded", now());
       if (!(await store.succeed(effectId, leaseOwner, result, now()))) {
         throw new UnknownEffectOutcomeError(
           "Provider succeeded but the local completion lease was lost",
         );
       }
+      await store.finishAttempt(attemptId, "succeeded", now());
     } catch (error) {
       await stopRenewal();
       const outcomeError = signal.aborted
         ? new UnknownEffectOutcomeError(
             "Execution interrupted; outcome requires reconciliation",
           )
-        : error;
+        : providerReturned && !(error instanceof UnknownEffectOutcomeError)
+          ? new UnknownEffectOutcomeError(
+              "Provider returned but local completion could not be confirmed",
+            )
+          : error;
       const message =
         outcomeError instanceof Error
           ? outcomeError.message

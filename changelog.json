@@ -5,6 +5,16 @@
 		{
 			"changes": [
 				{
+					"kind": "fixed",
+					"summary": "Confirm durable completion before sealing attempt success; quarantine completion write failures after provider return."
+				}
+			],
+			"date": "2026-10-07",
+			"version": "0.14.9"
+		},
+		{
+			"changes": [
+				{
 					"kind": "changed",
 					"summary": "Persist bounded step progress and renew queued effect leases; quarantine interrupted provider outcomes.",
 					"symbols": [

@@ -391,3 +391,80 @@ for (const mode of ["lost", "error", "abort"] as const) {
     expect(calls).toBe(1);
   });
 }
+
+for (const completion of ["lease-lost", "write-failed", "ack-lost"] as const) {
+  test(`completion ${completion} never retries the provider or prematurely seals the attempt`, async () => {
+    const retained = createMemoryEffectStore();
+    const id = `completion-${completion}`;
+    await retained.enqueue(effect(id));
+    let calls = 0;
+    const store = {
+      ...retained,
+      // Durable stores only finish running attempts. Memory normally permits
+      // overwrites, which previously hid a premature success audit entry.
+      finishAttempt: async (
+        ...args: Parameters<typeof retained.finishAttempt>
+      ) => {
+        const attempt = (await retained.listAttempts(id)).find(
+          (a) => a.attemptId === args[0],
+        );
+        if (attempt?.outcome === "running")
+          await retained.finishAttempt(...args);
+      },
+      succeed: async (...args: Parameters<typeof retained.succeed>) => {
+        if (completion === "lease-lost") return false;
+        if (completion === "ack-lost") await retained.succeed(...args);
+        throw new Error("completion connection lost");
+      },
+    };
+    const handler = createExecutionQueueHandler({
+      handlers: {
+        send: {
+          execute: async () => {
+            calls++;
+            return { providerId: "sent" };
+          },
+        },
+      },
+      store,
+    });
+    const context = {
+      attempts: 0,
+      id,
+      kind: "absolutejs.execution.effect" as const,
+      maxAttempts: 5,
+      signal: new AbortController().signal,
+    };
+    await handler({ effectId: id }, context);
+    await handler({ effectId: id }, context);
+    expect(calls).toBe(1);
+    expect((await retained.get(id))?.status).toBe(
+      completion === "ack-lost" ? "succeeded" : "unknown",
+    );
+    expect((await retained.listAttempts(id)).map((a) => a.outcome)).toEqual([
+      "unknown",
+    ]);
+  });
+}
+
+test("standalone completion write failure requires reconciliation", async () => {
+  const retained = createMemoryEffectStore();
+  await retained.enqueue(effect("standalone-write-failed"));
+  let calls = 0;
+  const worker = createEffectWorker({
+    handlers: { send: { execute: async () => ++calls } },
+    store: {
+      ...retained,
+      succeed: async () => {
+        throw new Error("connection lost");
+      },
+    },
+    workerId: "standalone",
+  });
+  await worker.runOnce();
+  await worker.runOnce();
+  expect(calls).toBe(1);
+  expect((await retained.get("standalone-write-failed"))?.status).toBe(
+    "unknown",
+  );
+});

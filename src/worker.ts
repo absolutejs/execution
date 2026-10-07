@@ -53,6 +53,7 @@ export const createEffectWorker = ({
     }
     const controller = new AbortController();
     let result: unknown;
+    let providerReturned = false;
     try {
       result = await handler.execute(effect.input, {
         actionId: effect.actionId,
@@ -63,12 +64,19 @@ export const createEffectWorker = ({
         signal: controller.signal,
         tenantId: effect.tenantId,
       });
+      providerReturned = true;
       if (!(await store.succeed(effect.effectId, workerId, result, now()))) {
         throw new UnknownEffectOutcomeError(
           "Effect lease lost before completion",
         );
       }
-    } catch (error) {
+    } catch (caught) {
+      const error =
+        providerReturned && !(caught instanceof UnknownEffectOutcomeError)
+          ? new UnknownEffectOutcomeError(
+              "Provider returned but local completion could not be confirmed",
+            )
+          : caught;
       const message = error instanceof Error ? error.message : "Effect failed";
       const unknown = error instanceof UnknownEffectOutcomeError;
       const reconciliationReference = unknown

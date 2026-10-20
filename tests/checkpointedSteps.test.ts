@@ -103,3 +103,58 @@ test("budget stop is durable and cannot gain more steps on reconnection", async 
     runCheckpointedSteps({ ...options, planKey: "changed" }),
   ).rejects.toBeInstanceOf(UnknownEffectOutcomeError);
 });
+
+test("funding pause continues only unfinished steps under the exact revision", async () => {
+  const { options, calls } = fixture();
+  const paused = await runCheckpointedSteps({
+    ...options,
+    beforeStep: async (index) => (index === 1 ? { pause: "funding" } : true),
+  });
+  expect(paused.completed).toEqual(["one"]);
+  expect(paused.pauseReason).toBe("funding");
+  const revision = (await options.load())!.revision;
+  expect((await runCheckpointedSteps(options)).completed).toEqual(["one"]);
+  await expect(
+    runCheckpointedSteps({
+      ...options,
+      resume: { expectedRevision: revision - 1, reason: "funding" },
+    }),
+  ).rejects.toThrow("mismatch");
+  const result = await runCheckpointedSteps({
+    ...options,
+    resume: { expectedRevision: revision, reason: "funding" },
+  });
+  expect(result.completed).toEqual(["one", "two", "three"]);
+  expect(calls).toEqual([0, 1, 2]);
+  await expect(
+    runCheckpointedSteps({
+      ...options,
+      resume: { expectedRevision: revision, reason: "funding" },
+    }),
+  ).rejects.toThrow("mismatch");
+});
+test("ordinary stops and uncertain steps cannot be continued as funding pauses", async () => {
+  const { options } = fixture();
+  await runCheckpointedSteps({ ...options, beforeStep: async () => false });
+  await expect(
+    runCheckpointedSteps({
+      ...options,
+      resume: { expectedRevision: 1, reason: "funding" },
+    }),
+  ).rejects.toThrow("mismatch");
+  const other = fixture();
+  await expect(
+    runCheckpointedSteps({
+      ...other.options,
+      runStep: async () => {
+        throw Error("lost outcome");
+      },
+    }),
+  ).rejects.toThrow();
+  await expect(
+    runCheckpointedSteps({
+      ...other.options,
+      resume: { expectedRevision: 1, reason: "funding" },
+    }),
+  ).rejects.toThrow("uncertain");
+});

@@ -5,6 +5,7 @@ export type StepCheckpoint<Result> = {
   completed: Result[];
   inFlight: number | null;
   stopped: boolean;
+  pauseReason?: string;
 };
 export type VersionedStepCheckpoint<Result> = {
   revision: number;
@@ -21,7 +22,9 @@ export type CheckpointedStepsOptions<Step, Result> = {
     value: StepCheckpoint<Result>,
   ) => Promise<number>;
   /** Return false to durably stop before spending on another step. */
-  beforeStep: (index: number) => Promise<boolean>;
+  beforeStep: (index: number) => Promise<boolean | { pause: string }>;
+  /** Explicit continuation, under a new exclusive lease, of this exact saved pause. */
+  resume?: { expectedRevision: number; reason: string };
   /** Return only after known usage and the result are durable enough to checkpoint.
    * Disable provider retries unless the provider supports safe idempotency. */
   runStep: (step: Step, index: number, signal: AbortSignal) => Promise<Result>;
@@ -57,14 +60,38 @@ export const runCheckpointedSteps = async <Step, Result>(
     revision = await options.save(revision, structuredClone(value));
     checkpoint = value;
   };
+  if (options.resume) {
+    if (
+      !saved ||
+      revision !== options.resume.expectedRevision ||
+      !checkpoint.stopped ||
+      !checkpoint.pauseReason ||
+      checkpoint.pauseReason !== options.resume.reason
+    )
+      throw new Error("Paused checkpoint revision or reason mismatch");
+    const { pauseReason: _reason, ...progress } = checkpoint;
+    await persist({ ...progress, stopped: false });
+  }
   while (
     !checkpoint.stopped &&
     checkpoint.completed.length < options.steps.length
   ) {
     options.signal.throwIfAborted();
     const index = checkpoint.completed.length;
-    if (!(await options.beforeStep(index))) {
-      await persist({ ...checkpoint, stopped: true });
+    const decision = await options.beforeStep(index);
+    if (decision !== true) {
+      if (
+        typeof decision === "object" &&
+        (!decision.pause || decision.pause.length > 128)
+      )
+        throw new Error("Invalid pause reason");
+      await persist({
+        ...checkpoint,
+        stopped: true,
+        ...(typeof decision === "object"
+          ? { pauseReason: decision.pause }
+          : {}),
+      });
       break;
     }
     options.signal.throwIfAborted();

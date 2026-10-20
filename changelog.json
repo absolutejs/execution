@@ -5,6 +5,21 @@
 		{
 			"changes": [
 				{
+					"kind": "added",
+					"summary": "Continue explicit funding pauses without replaying completed or uncertain steps",
+					"symbols": [
+						"StepCheckpoint",
+						"CheckpointedStepsOptions",
+						"runCheckpointedSteps"
+					]
+				}
+			],
+			"date": "2026-10-20",
+			"version": "0.14.10"
+		},
+		{
+			"changes": [
+				{
 					"kind": "fixed",
 					"summary": "Confirm durable completion before sealing attempt success; quarantine completion write failures after provider return."
 				}

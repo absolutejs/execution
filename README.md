@@ -187,3 +187,13 @@ renewed every 10 seconds), forwards shutdown/lease loss through the handler's
 signal, and quarantines uncertain completion. Each invocation has a unique lease
 owner. The queue job lease must also exceed the bounded job duration or be renewed
 by the queue worker. This API does not make arbitrary providers idempotent.
+
+### Resumable funding pauses
+
+Return `{ pause: "funding" }` from `runCheckpointedSteps.beforeStep` to persist
+a resumable stop before the next provider call. After funding is verified and
+an exclusive execution lease is acquired, pass `resume: { expectedRevision,
+reason: "funding" }`. The runner checks the exact checkpoint revision, immutable
+plan and pause reason, preserves completed results, and rejects any in-flight
+uncertain operation. A plain `false` remains a terminal stop. Never reset a
+checkpoint or create a new plan just to retry a funding interruption.

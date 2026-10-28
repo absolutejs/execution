@@ -1,45 +1,59 @@
 {
-	"contract": 1,
-	"name": "@absolutejs/execution",
-	"releases": [
-		{
-			"changes": [
-				{
-					"kind": "added",
-					"summary": "Continue explicit funding pauses without replaying completed or uncertain steps",
-					"symbols": [
-						"StepCheckpoint",
-						"CheckpointedStepsOptions",
-						"runCheckpointedSteps"
-					]
-				}
-			],
-			"date": "2026-10-20",
-			"version": "0.14.10"
-		},
-		{
-			"changes": [
-				{
-					"kind": "fixed",
-					"summary": "Confirm durable completion before sealing attempt success; quarantine completion write failures after provider return."
-				}
-			],
-			"date": "2026-10-07",
-			"version": "0.14.9"
-		},
-		{
-			"changes": [
-				{
-					"kind": "changed",
-					"summary": "Persist bounded step progress and renew queued effect leases; quarantine interrupted provider outcomes.",
-					"symbols": [
-						"createExecutionQueueHandler",
-						"runCheckpointedSteps"
-					]
-				}
-			],
-			"date": "2026-09-13",
-			"version": "0.14.8"
-		}
-	]
+  "contract": 1,
+  "name": "@absolutejs/execution",
+  "releases": [
+    {
+      "version": "0.14.11",
+      "date": "2026-10-28",
+      "changes": [
+        {
+          "kind": "fixed",
+          "summary": "Preserve the original exception cause when a checkpointed step becomes uncertain, without changing replay safety.",
+          "symbols": [
+            "UnknownEffectOutcomeError",
+            "runCheckpointedSteps"
+          ]
+        }
+      ]
+    },
+    {
+      "changes": [
+        {
+          "kind": "added",
+          "summary": "Continue explicit funding pauses without replaying completed or uncertain steps",
+          "symbols": [
+            "StepCheckpoint",
+            "CheckpointedStepsOptions",
+            "runCheckpointedSteps"
+          ]
+        }
+      ],
+      "date": "2026-10-20",
+      "version": "0.14.10"
+    },
+    {
+      "changes": [
+        {
+          "kind": "fixed",
+          "summary": "Confirm durable completion before sealing attempt success; quarantine completion write failures after provider return."
+        }
+      ],
+      "date": "2026-10-07",
+      "version": "0.14.9"
+    },
+    {
+      "changes": [
+        {
+          "kind": "changed",
+          "summary": "Persist bounded step progress and renew queued effect leases; quarantine interrupted provider outcomes.",
+          "symbols": [
+            "createExecutionQueueHandler",
+            "runCheckpointedSteps"
+          ]
+        }
+      ],
+      "date": "2026-09-13",
+      "version": "0.14.8"
+    }
+  ]
 }

@@ -11,10 +11,11 @@ export class UnknownEffectOutcomeError extends Error {
   constructor(
     message = "Provider outcome is unknown",
     options?: {
+      cause?: unknown;
       reconciliationReference?: EffectProviderReconciliationReference;
     },
   ) {
-    super(message);
+    super(message, options);
     this.name = "UnknownEffectOutcomeError";
     this.reconciliationReference = options?.reconciliationReference;
   }

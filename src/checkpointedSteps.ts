@@ -110,9 +110,10 @@ export const runCheckpointedSteps = async <Step, Result>(
         completed: [...checkpoint.completed, result],
         inFlight: null,
       });
-    } catch {
+    } catch (cause) {
       throw new UnknownEffectOutcomeError(
         "Step result or metering could not be checkpointed; reconciliation required",
+        { cause },
       );
     }
   }

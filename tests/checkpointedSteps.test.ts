@@ -158,3 +158,22 @@ test("ordinary stops and uncertain steps cannot be continued as funding pauses",
     }),
   ).rejects.toThrow("uncertain");
 });
+
+test("checkpoint uncertainty preserves its original cause without repeating work", async () => {
+  const { options } = fixture();
+  const cause = new Error("provider schema rejection");
+  let caught: unknown;
+  try {
+    await runCheckpointedSteps({
+      ...options,
+      runStep: async () => {
+        throw cause;
+      },
+    });
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(UnknownEffectOutcomeError);
+  expect((caught as Error).cause).toBe(cause);
+  expect((await options.load())?.value.inFlight).toBe(0);
+});
